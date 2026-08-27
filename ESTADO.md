@@ -5,7 +5,7 @@ Este archivo existe para que el contexto **viaje entre máquinas**. Lo demás vi
 
 Si acabas de clonar el repo en otra máquina, lee esto primero.
 
-**Última actualización:** 2026-08-27
+**Última actualización:** 2026-08-27 (tras PR #10)
 
 ---
 
@@ -24,22 +24,20 @@ rutas de API  17, exactamente las del §8
 La skill de `skill/agent-mesh/` funciona contra el servicio **sin una sola
 modificación**. Es el test de aceptación, no un artefacto que se ajuste al servicio.
 
-### Los PRs están apilados y sin revisar
+### Todo el código está en `main` (desde PR #10)
 
-```
-main ← #1 paso-1-esqueleto
-        ← #2 paso-2-esquema
-          ← #3 paso-3-admin
-            ← #4 paso-4-sesiones
-              ← #5 paso-5-mensajeria
-                ← #6 paso-6-unclaimed
-                  ← #7 paso-7-documentos
-                    ← #8 paso-8-panel
-```
+Los ocho pasos se desarrollaron en PRs **apilados** (`#1 paso-1` ← `#2 paso-2` ← … ←
+`#8 paso-8`) y se fusionaron **de arriba hacia abajo**: #1 entró a `main` primero, cuando
+`paso-1` aún era solo el esqueleto, y cada PR siguiente cayó en la rama de abajo *antes*
+de que esa rama recibiera su propio merge. Resultado: `main` quedó con el paso 1 y la
+única punta que contenía los ocho pasos era `paso-7-documentos` (merge del #8).
 
-**Mergear de abajo hacia arriba.** GitHub reapunta cada PR a `main` solo cuando se
-merge el de debajo. Mientras no se mergeen, `main` contiene solo el diseño inicial: el
-código está en las ramas.
+Se corrigió con **PR #10** (`paso-7-documentos` → `main`, sin conflictos, 272 pruebas en
+verde sobre el árbol fusionado). Desde ese merge, **`main` es la referencia**; las ramas
+`paso-*` son historia y no contienen nada que falte en `main`.
+
+Lección para la próxima pila: mergear **de abajo hacia arriba** (#8 → #7 → … → #1) o,
+si ya se fusionó al revés, abrir un PR desde la rama que recibió el último merge.
 
 ---
 
