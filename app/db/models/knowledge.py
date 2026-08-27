@@ -9,7 +9,6 @@ from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -21,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import enums, ids
 from app.db.base import Base, utcnow
+from app.db.types import UtcDateTime
 
 
 class Document(Base):
@@ -59,10 +59,8 @@ class Document(Base):
     # Si no coincide -> 409 con la versión vigente.
     current_version: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(16), default="active")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, onupdate=utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow, onupdate=utcnow)
 
 
 class DocumentVersion(Base):
@@ -102,4 +100,4 @@ class DocumentVersion(Base):
     author_session_id: Mapped[str | None] = mapped_column(
         ForeignKey("sessions.id", ondelete="SET NULL")
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)

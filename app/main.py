@@ -15,7 +15,9 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.admin.deps import RedirectToLoginError
 from app.admin.routes import router as admin_router
+from app.api.errors import register_error_handlers
 from app.api.health import router as health_router
+from app.api.v1.router import router as api_v1_router
 from app.config import Settings, get_settings
 from app.db.session import SessionLocal
 from app.services import identity
@@ -101,7 +103,10 @@ def create_app() -> FastAPI:
     async def _to_login(_request: Request, exc: RedirectToLoginError) -> RedirectResponse:
         return RedirectResponse(url=exc.to, status_code=303)
 
+    register_error_handlers(app)
+
     app.include_router(health_router)
+    app.include_router(api_v1_router)
     app.include_router(admin_router)
     return app
 

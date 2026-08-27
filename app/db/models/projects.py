@@ -12,7 +12,6 @@ from sqlalchemy import (
     JSON,
     Boolean,
     CheckConstraint,
-    DateTime,
     ForeignKey,
     Index,
     String,
@@ -22,6 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import enums, ids
 from app.db.base import Base, utcnow
+from app.db.types import UtcDateTime
 
 
 class Project(Base):
@@ -40,7 +40,7 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(160))
     description: Mapped[str] = mapped_column(Text, default="")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
 
 
 class ProjectMember(Base):
@@ -57,7 +57,7 @@ class ProjectMember(Base):
     person_id: Mapped[str] = mapped_column(
         ForeignKey("people.id", ondelete="CASCADE"), primary_key=True
     )
-    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    joined_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
 
 
 class AgentSession(Base):
@@ -99,8 +99,8 @@ class AgentSession(Base):
     # de la persona), pero no debe ser adivinable.
     session_key: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     status: Mapped[str] = mapped_column(String(16), default="active")
-    registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    registered_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
     # Sin heartbeat durante SESSION_STALE_AFTER_SECONDS la sesión pasa a `stale`
     # y sus mensajes sin ack vuelven a circular.
-    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
     agent_metadata: Mapped[dict[str, Any] | None] = mapped_column(JSON)

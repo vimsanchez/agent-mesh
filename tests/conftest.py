@@ -103,3 +103,48 @@ def migrated_engine(tmp_db_url: str) -> Iterator[Engine]:
         yield fresh
     finally:
         fresh.dispose()
+
+
+# --------------------------------------------------------- ayudas de la API v1
+
+
+@pytest.fixture
+def mundo(db: SASession) -> "Mundo":
+    """El escenario de SPEC §3: dos proyectos, tres personas, tokens emitidos.
+
+    Es deliberadamente el ejemplo del spec y no un caso mínimo, porque las
+    pruebas que más importan son las de aislamiento, y esas necesitan que exista
+    un segundo proyecto al que asomarse.
+    """
+    from app.services import identity
+
+    pablo_proj = identity.create_project(db, slug="proyecto-pablo", name="Pedidos")
+    luis_proj = identity.create_project(db, slug="proyecto-luis", name="Portal")
+
+    victor = identity.create_person(db, email="victor@e.test", display_name="victor")
+    pablo = identity.create_person(db, email="pablo@e.test", display_name="pablo")
+    luis = identity.create_person(db, email="luis@e.test", display_name="luis")
+
+    identity.add_member(db, project=pablo_proj, person=victor)
+    identity.add_member(db, project=pablo_proj, person=pablo)
+    identity.add_member(db, project=luis_proj, person=victor)
+    identity.add_member(db, project=luis_proj, person=luis)
+
+    tokens_por_persona = {
+        p.display_name: identity.issue_token(db, person=p).plain for p in (victor, pablo, luis)
+    }
+    db.commit()
+    return Mundo(tokens=tokens_por_persona)
+
+
+class Mundo:
+    """Tokens del escenario, y el atajo para autenticar peticiones."""
+
+    def __init__(self, tokens: dict[str, str]) -> None:
+        self.tokens = tokens
+
+    def auth(self, persona: str) -> dict[str, str]:
+        return {"Authorization": f"Bearer {self.tokens[persona]}"}
+
+    def sesion(self, persona: str, session_key: str) -> dict[str, str]:
+        return {**self.auth(persona), "X-Mesh-Session": session_key}
