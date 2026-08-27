@@ -40,7 +40,15 @@ class RegisterIn(BaseModel):
 
 class SessionOut(BaseModel):
     session_key: str
-    address: str
+    address: str = Field(
+        description="Buzón del rol: 'persona.rol'. Es la dirección estable y la "
+        "que se cita en los acuerdos."
+    )
+    session_address: str = Field(
+        description="Esta sesión concreta: 'persona.rol.sufijo'. Sirve para que "
+        "una réplica vuelva a quien atendió, no para apuntarla a largo plazo: "
+        "cambia en cada register."
+    )
     project: str
     registered_at: datetime
 
@@ -58,6 +66,9 @@ class ClosedOut(BaseModel):
 
 class RosterEntry(BaseModel):
     address: str
+    session_address: str = Field(
+        description="Distingue dos sesiones de la misma persona con el mismo rol."
+    )
     status: str
     last_seen_at: datetime
 

@@ -11,6 +11,7 @@ hasta que alguien mira. Da igual, porque el único efecto de estar `stale` es qu
 sus mensajes vuelvan a circular, y eso solo importa cuando alguien va a leerlos.
 """
 
+from dataclasses import dataclass
 from datetime import timedelta
 
 from sqlalchemy import select
@@ -18,16 +19,31 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.db.base import utcnow
-from app.db.ids import new_session_key
+from app.db.ids import SESSION, new_id, new_session_key
 from app.db.models import AgentSession, Person, Project, ProjectMember
 from app.services import addressing
 from app.services.errors import (
     ForbiddenError,
     NotFoundError,
     SessionGoneError,
+    ValidationFailedError,
 )
 
 LIVE_STATUSES = ("active",)
+MAX_SUFFIX_ATTEMPTS = 8
+
+
+@dataclass(frozen=True)
+class RosterRow:
+    """Una sesión viva con sus dos formas de dirección.
+
+    Se exponen ambas para que quien lea el roster distinga dos sesiones con el
+    mismo rol sin tener que deducirlo.
+    """
+
+    session: AgentSession
+    address: str
+    session_address: str
 
 
 # ------------------------------------------------------------------- pertenencia
@@ -93,6 +109,43 @@ def expire_stale_sessions(
 # -------------------------------------------------------------------- registro
 
 
+def normalize_role(role_label: str) -> str:
+    """Valida y normaliza la etiqueta de rol.
+
+    El punto está prohibido porque es el separador de los tres niveles de una
+    dirección: `persona.rol.sufijo`. Un rol como `mi.rol` volvería ambigua a
+    `victor.mi.rol`, que podría leerse como rol `mi.rol` o como rol `mi` con
+    sufijo `rol`.
+    """
+    role = role_label.strip().lower()
+    if not role:
+        raise ValidationFailedError(
+            "el rol no puede estar vacío; usa 'general' si esta sesión hace de todo"
+        )
+    if addressing.SEPARATOR in role:
+        raise ValidationFailedError(
+            f"'{role_label}' no sirve como rol: el punto separa persona, rol y "
+            f"sesión en una dirección. Usa guiones, por ejemplo 'base-datos'."
+        )
+    return role
+
+
+def _live_siblings(
+    db: Session, *, project_id: str, person_id: str, role: str
+) -> list[AgentSession]:
+    """Sesiones vivas de esta misma persona con este mismo rol en este proyecto."""
+    return list(
+        db.scalars(
+            select(AgentSession).where(
+                AgentSession.project_id == project_id,
+                AgentSession.person_id == person_id,
+                AgentSession.role_label == role,
+                AgentSession.status.in_(LIVE_STATUSES),
+            )
+        )
+    )
+
+
 def register(db: Session, *, person: Person, slug: str, role_label: str) -> AgentSession:
     """Registra una sesión. El rol es una etiqueta libre, no un catálogo.
 
@@ -101,11 +154,22 @@ def register(db: Session, *, person: Person, slug: str, role_label: str) -> Agen
     ofrece a ambas y decide el reclamo atómico.
     """
     project = assert_member(db, person=person, slug=slug)
-    role = role_label.strip().lower()
-    if not role:
-        raise ForbiddenError("el rol no puede estar vacío; usa 'general' si haces de todo")
+    role = normalize_role(role_label)
+
+    hermanas = _live_siblings(db, project_id=project.id, person_id=person.id, role=role)
+    ocupados = {addressing.session_suffix(s.id) for s in hermanas}
+
+    # El sufijo se deriva del id, así que para cambiarlo hay que generar otro id.
+    # Con 65536 sufijos y un puñado de hermanas esto casi nunca itera; el bucle
+    # está acotado para que un caso patológico no cuelgue el registro.
+    session_id = new_id(SESSION)
+    for _ in range(MAX_SUFFIX_ATTEMPTS):
+        if addressing.session_suffix(session_id) not in ocupados:
+            break
+        session_id = new_id(SESSION)
 
     agent_session = AgentSession(
+        id=session_id,
         project_id=project.id,
         person_id=person.id,
         role_label=role,
@@ -116,11 +180,18 @@ def register(db: Session, *, person: Person, slug: str, role_label: str) -> Agen
     return agent_session
 
 
-def address_of(db: Session, agent_session: AgentSession) -> str:
+def address_of(db: Session, agent_session: AgentSession, *, precise: bool = False) -> str:
+    """Dirección de una sesión.
+
+    Por defecto devuelve el buzón del rol (`victor.db`), que es lo que `api.md`
+    documenta y lo que el agente guarda como su dirección. Con `precise=True`
+    añade el sufijo de sesión (`victor.db.a7f3`).
+    """
     person = db.get(Person, agent_session.person_id)
     if person is None:  # pragma: no cover - lo impide la FK
         raise NotFoundError("la persona de esta sesión ya no existe")
-    return addressing.format_address(person.display_name, agent_session.role_label)
+    suffix = addressing.session_suffix(agent_session.id) if precise else None
+    return addressing.format_address(person.display_name, agent_session.role_label, suffix)
 
 
 # --------------------------------------------------------------- ciclo de vida
@@ -166,9 +237,7 @@ def close(db: Session, *, person: Person, session_key: str) -> AgentSession:
     return agent_session
 
 
-def roster(
-    db: Session, settings: Settings, *, person: Person, slug: str
-) -> list[tuple[AgentSession, str]]:
+def roster(db: Session, settings: Settings, *, person: Person, slug: str) -> list[RosterRow]:
     """Sesiones vivas del proyecto, con su dirección.
 
     Marca las caídas antes de responder: si no, el roster diría que sigue vivo
@@ -187,6 +256,14 @@ def roster(
         .order_by(Person.display_name, AgentSession.role_label)
     ).all()
     return [
-        (agent_session, addressing.format_address(p.display_name, agent_session.role_label))
+        RosterRow(
+            session=agent_session,
+            address=addressing.format_address(p.display_name, agent_session.role_label),
+            session_address=addressing.format_address(
+                p.display_name,
+                agent_session.role_label,
+                addressing.session_suffix(agent_session.id),
+            ),
+        )
         for agent_session, p in filas
     ]

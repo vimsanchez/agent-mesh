@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -296,3 +297,88 @@ def test_expire_es_idempotente(client: TestClient, mundo: Mundo) -> None:
 
     assert len(primera) == 1
     assert segunda == [], "no debe volver a marcar lo ya marcado"
+
+
+# ---------------------------------------- sufijo de sesión y roles con punto
+
+
+def test_registrar_devuelve_las_dos_formas_de_direccion(
+    client: TestClient, mundo: Mundo
+) -> None:
+    datos = _registrar(client, mundo, "victor", "proyecto-pablo", "db")
+
+    assert datos["address"] == "victor.db"
+    assert datos["session_address"].startswith("victor.db.")
+    assert len(datos["session_address"].rsplit(".", 1)[1]) == 4
+
+
+def test_dos_sesiones_del_mismo_rol_comparten_buzon_y_no_sufijo(
+    client: TestClient, mundo: Mundo
+) -> None:
+    """El caso que motivó el sufijo: dos terminales, mismo rol.
+
+    El buzón debe coincidir —para que Pablo pueda escribirle sin saber nada— y
+    el sufijo debe diferir, para que se puedan distinguir.
+    """
+    una = _registrar(client, mundo, "victor", "proyecto-pablo", "db")
+    otra = _registrar(client, mundo, "victor", "proyecto-pablo", "db")
+
+    assert una["address"] == otra["address"] == "victor.db"
+    assert una["session_address"] != otra["session_address"]
+
+
+def test_el_roster_distingue_dos_sesiones_del_mismo_rol(
+    client: TestClient, mundo: Mundo
+) -> None:
+    _registrar(client, mundo, "victor", "proyecto-pablo", "db")
+    _registrar(client, mundo, "victor", "proyecto-pablo", "db")
+
+    datos = client.get(
+        f"{V1}/projects/proyecto-pablo/roster", headers=mundo.auth("victor")
+    ).json()
+
+    buzones = {s["address"] for s in datos["sessions"]}
+    precisas = {s["session_address"] for s in datos["sessions"]}
+    assert buzones == {"victor.db"}, "un solo buzón compartido"
+    assert len(precisas) == 2, "pero dos direcciones de sesión distinguibles"
+
+
+def test_una_sesion_muerta_no_bloquea_el_sufijo_de_la_nueva(
+    client: TestClient, mundo: Mundo
+) -> None:
+    """La unicidad se exige solo entre hermanas VIVAS.
+
+    Si se exigiera contra todo el historial, cada re-registro iría agotando el
+    espacio de sufijos sin necesidad.
+    """
+    vieja = _registrar(client, mundo, "victor", "proyecto-pablo", "db")
+    client.delete(f"{V1}/sessions/{vieja['session_key']}", headers=mundo.auth("victor"))
+
+    nueva = _registrar(client, mundo, "victor", "proyecto-pablo", "db")
+
+    assert nueva["address"] == "victor.db"
+
+
+@pytest.mark.parametrize("rol_malo", ["mi.rol", ".db", "db.", "a.b.c"])
+def test_un_rol_con_punto_es_rechazado(client: TestClient, mundo: Mundo, rol_malo: str) -> None:
+    """El punto separa persona, rol y sesión: en un rol volvería ambigua la
+    dirección. `victor.mi.rol` podría ser rol 'mi.rol' o rol 'mi' + sufijo 'rol'."""
+    respuesta = client.post(
+        f"{V1}/sessions",
+        headers=mundo.auth("victor"),
+        json={"project": "proyecto-pablo", "role": rol_malo},
+    )
+
+    assert respuesta.status_code == 422
+    assert "el punto separa" in respuesta.json()["detail"]
+
+
+def test_un_rol_vacio_es_rechazado_con_una_sugerencia(client: TestClient, mundo: Mundo) -> None:
+    respuesta = client.post(
+        f"{V1}/sessions",
+        headers=mundo.auth("victor"),
+        json={"project": "proyecto-pablo", "role": "   "},
+    )
+
+    assert respuesta.status_code == 422
+    assert "general" in respuesta.json()["detail"]

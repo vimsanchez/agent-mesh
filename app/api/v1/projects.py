@@ -40,10 +40,11 @@ def roster(db: Db, person: CurrentPerson, settings: Config, slug: str) -> Roster
     return RosterOut(
         sessions=[
             RosterEntry(
-                address=address,
-                status=agent_session.status,
-                last_seen_at=agent_session.last_seen_at,
+                address=fila.address,
+                session_address=fila.session_address,
+                status=fila.session.status,
+                last_seen_at=fila.session.last_seen_at,
             )
-            for agent_session, address in filas
+            for fila in filas
         ]
     )

@@ -20,10 +20,12 @@ def register(db: Db, person: CurrentPerson, body: RegisterIn) -> SessionOut:
         db, person=person, slug=body.project, role_label=body.role
     )
     address = sessions.address_of(db, agent_session)
+    session_address = sessions.address_of(db, agent_session, precise=True)
     db.commit()
     return SessionOut(
         session_key=agent_session.session_key,
         address=address,
+        session_address=session_address,
         project=body.project.strip().lower(),
         registered_at=agent_session.registered_at,
     )
