@@ -170,8 +170,10 @@ def cmd_close(a):
 
 
 def cmd_roster(a):
-    s = load_session()
-    emit(request("GET", f"/projects/{s['project']}/roster"))
+    """Quién está vivo. Antes de registrarse hace falta --project: sirve para
+    elegir un rol que no choque con una sesión ya viva."""
+    slug = a.project or load_session()["project"]
+    emit(request("GET", f"/projects/{slug}/roster"))
 
 
 def cmd_send(a):
@@ -253,7 +255,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("heartbeat", help="Mantiene viva la sesión").set_defaults(func=cmd_heartbeat)
     sub.add_parser("close", help="Cierra la sesión").set_defaults(func=cmd_close)
-    sub.add_parser("roster", help="Quién está vivo").set_defaults(func=cmd_roster)
+    ro = sub.add_parser("roster", help="Quién está vivo")
+    ro.add_argument("--project", help="Slug del proyecto; obligatorio antes de registrar")
+    ro.set_defaults(func=cmd_roster)
     sub.add_parser("unclaimed", help="Bandeja de no reclamados").set_defaults(func=cmd_unclaimed)
     sub.add_parser("docs", help="Índice de documentos").set_defaults(func=cmd_docs)
 
