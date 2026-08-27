@@ -8,7 +8,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.db.enums import MessageKind
+from app.db.enums import ContributionIntent, MessageKind
 
 # ------------------------------------------------------------------ proyectos
 
@@ -158,3 +158,53 @@ class ClaimOut(BaseModel):
 class DismissOut(BaseModel):
     id: str
     dismissed: bool
+
+
+# ------------------------------------------------------------------ documentos
+
+
+class DocumentIndexEntry(BaseModel):
+    id: str
+    path: str
+    title: str
+    current_version: int
+    updated_at: datetime
+
+
+class DocumentIndexOut(BaseModel):
+    documents: list[DocumentIndexEntry]
+
+
+class DocumentOut(BaseModel):
+    id: str
+    path: str
+    title: str
+    current_version: int = Field(
+        description="Guarda este número: lo necesitas como base_version para aportar."
+    )
+    content: str
+    status: str
+    updated_at: datetime
+
+
+class ContributeIn(BaseModel):
+    document_path: str
+    base_version: int
+    intent: ContributionIntent
+    anchor: str | None = None
+    content: str = ""
+    rationale: str
+
+
+class VersionEntry(BaseModel):
+    version: int
+    intent: str
+    rationale: str
+    author_address: str
+    created_at: datetime
+
+
+class VersionsOut(BaseModel):
+    document_id: str
+    path: str
+    versions: list[VersionEntry]
