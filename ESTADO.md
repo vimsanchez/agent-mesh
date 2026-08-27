@@ -5,7 +5,7 @@ Este archivo existe para que el contexto **viaje entre máquinas**. Lo demás vi
 
 Si acabas de clonar el repo en otra máquina, lee esto primero.
 
-**Última actualización:** 2026-08-27 (tras PR #11 y #12)
+**Última actualización:** 2026-08-27 (tras PR #13)
 
 ---
 
@@ -15,7 +15,7 @@ Los **ocho pasos** del orden de implementación de `SPEC.md` §10 están impleme
 las **siete pruebas críticas** del §11 pasan.
 
 ```
-pytest        274 passed
+pytest        275 passed
 ruff / format limpio
 mypy strict   sin fallos en app/ (38 archivos)
 rutas de API  17, exactamente las del §8
@@ -83,13 +83,15 @@ mensajes que ya volvieron a circular. El endpoint explícito se conserva.
 
 ## Pendiente de decisión
 
-Una cosa abierta que **no está registrada en el código**.
+Nada. Todo lo que estaba abierto quedó decidido el 27 de agosto de 2026:
 
-### `admin_users.role` con valores `owner | admin`
-
-`SPEC.md` §9 pide que la tabla y el campo existan desde el día uno pero no fija los
-valores. Los elegí al implementar el paso 2 y quedó sin confirmar. Nadie lee ese campo
-todavía, así que cambiarlo sigue siendo barato.
+- **`admin_users.role` se queda con `owner | admin`.** `SPEC.md` §9 pide el campo sin fijar
+  valores; `owner` es el administrador de bootstrap y `admin` cualquier otro que se dé de
+  alta. Hoy nadie lee el campo (solo se pinta como etiqueta en el encabezado del panel) y
+  ambos pueden hacer lo mismo; si algún día se restringe algo al `owner`, el dato ya está.
+- **`GET /` redirige a `/admin`** (307, temporal a propósito: si la raíz se vuelve una
+  página, que ningún navegador tenga la redirección cacheada). Quien recibe la URL pelona
+  del servicio cae en el login y no en un 404.
 
 ---
 
@@ -106,8 +108,7 @@ todavía, así que cambiarlo sigue siendo barato.
   *reemplaza* a Cloudflare Access. Es aceptable solo mientras el túnel sea la única
   puerta. `tests/test_despliegue.py` verifica la parte del compose; el túnel en sí no lo
   puede comprobar una prueba.
-- `GET /` devuelve `404`: no hay raíz, el panel vive en `/admin`. Decidir si se quiere
-  una redirección.
+- `GET /` redirige (307) a `/admin`; la API vive en `/api/v1` y la salud en `/healthz`.
 
 ---
 
