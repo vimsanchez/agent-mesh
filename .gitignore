@@ -1,0 +1,25 @@
+# Estado local del cliente de agente: mesh.py escribe session.json en el cwd.
+# Contiene session_key. Nunca se versiona.
+.agent-mesh/
+
+# Secretos. El token vive SOLO en el entorno del proceso (SPEC 3.2).
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Base de datos local
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Herramientas
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
