@@ -72,7 +72,7 @@ Importa por dos motivos:
 
 ### 3. El túnel de Cloudflare no está montado
 
-El servicio publica en `127.0.0.1:8000` y está verificado que **no** responde en la IP
+El servicio publica en `127.0.0.1:8840` (el 8000 es el puerto por defecto de uvicorn y en esta máquina hay decenas de servicios así; el segmento 8840–8849 queda para Agent Mesh) y está verificado que **no** responde en la IP
 de LAN, como exige `SPEC.md` §9. Pero apuntar el túnel sigue pendiente, así que el
 panel no es accesible desde fuera de la máquina.
 
@@ -144,7 +144,7 @@ Luego, con dos agentes en **directorios distintos** (`mesh.py` guarda su sesión
 `./.agent-mesh/` y dos sesiones en el mismo cwd se pisan):
 
 ```bash
-export MESH_URL=http://127.0.0.1:8000 MESH_TOKEN=<token emitido en /admin>
+export MESH_URL=http://127.0.0.1:8840 MESH_TOKEN=<token emitido en /admin>
 cd /tmp/agente-a && python .../skill/agent-mesh/scripts/mesh.py register --project <slug> --role db
 ```
 

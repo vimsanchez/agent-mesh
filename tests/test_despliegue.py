@@ -16,7 +16,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 COMPOSE_TEXTO = (RAIZ / "compose.yaml").read_text()
 # Se parsea el YAML en vez de buscar cadenas: los comentarios del archivo
 # mencionan justamente lo que NO se debe usar ("sin depends_on: condition",
-# 'publicar "8000:8000" lo expondría a la LAN'), así que un `in` sobre el texto
+# 'publicar "8840:8000" lo expondría a la LAN'), así que un `in` sobre el texto
 # da falsos positivos. Es una lección de la primera versión de estas pruebas.
 COMPOSE: dict[str, Any] = yaml.safe_load(COMPOSE_TEXTO)
 SERVICIO: dict[str, Any] = COMPOSE["services"]["mesh"]
@@ -37,7 +37,7 @@ def test_el_puerto_no_se_publica_a_la_lan() -> None:
     """
     publicados = SERVICIO["ports"]
 
-    assert publicados == ["127.0.0.1:8000:8000"], publicados
+    assert publicados == ["127.0.0.1:8840:8000"], publicados
     for mapeo in publicados:
         host = mapeo.rsplit(":", 2)[0]
         assert host == "127.0.0.1", f"'{mapeo}' escucha fuera de loopback"

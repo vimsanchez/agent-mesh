@@ -11,9 +11,9 @@ services:
       - mesh-data:/data
     ports:
       # SOLO loopback. SPEC.md §9: el túnel de Cloudflare debe ser el único
-      # camino de entrada. Publicar "8000:8000" lo expondría a la LAN y dejaría
+      # camino de entrada. Publicar "8840:8000" lo expondría a la LAN y dejaría
       # el panel accesible sin pasar por el túnel.
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8840:8000"
     restart: unless-stopped
     healthcheck:
       test:
