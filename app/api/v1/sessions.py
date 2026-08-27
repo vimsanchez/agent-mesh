@@ -4,7 +4,7 @@ from fastapi import APIRouter
 
 from app.api.v1.schemas import ClosedOut, HeartbeatOut, RegisterIn, SessionOut
 from app.security.deps import Config, CurrentPerson, Db
-from app.services import sessions
+from app.services import messaging, sessions
 
 router = APIRouter(tags=["sessions"])
 
@@ -50,7 +50,7 @@ def heartbeat(
 @router.delete("/sessions/{session_key}", response_model=ClosedOut)
 def close(db: Db, person: CurrentPerson, session_key: str) -> ClosedOut:
     """Cierre limpio: los mensajes entregados sin `ack` vuelven a circular."""
-    agent_session = sessions.close(db, person=person, session_key=session_key)
+    agent_session = messaging.close_session(db, person=person, session_key=session_key)
     address = sessions.address_of(db, agent_session)
     db.commit()
     return ClosedOut(address=address, status=agent_session.status)
