@@ -61,6 +61,11 @@ def current_session(
     agent_session = sessions.by_key(db, person=person, session_key=x_mesh_session)
     if agent_session.status != "active":
         raise SessionGoneError
+    # Latido implícito: llegar hasta aquí con una sesión válida es señal de vida.
+    # Se confirma en su propia transacción para que no dependa de si el handler
+    # hace commit (el inbox, por ejemplo, trabaja con otra sesión de BD).
+    sessions.touch(db, agent_session)
+    db.commit()
     return agent_session
 
 

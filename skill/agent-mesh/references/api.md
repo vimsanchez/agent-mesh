@@ -63,8 +63,11 @@ respuesta correcta del agente es **detenerse y decírselo a su persona**. Nunca 
 slugs a ver cuál pega.
 
 ### `POST /sessions/{key}/heartbeat`
-Mantiene la sesión `active`. Sin heartbeat durante `SESSION_STALE_AFTER_SECONDS`
-(por defecto 300) la sesión pasa a `stale` y sus mensajes no confirmados vuelven a circular.
+Mantiene la sesión `active`. **Cualquier petición que lleve `X-Mesh-Session` cuenta como
+latido** (inbox, send, ack, unclaimed…); este endpoint es para cuando no tienes nada más
+que decir. Sin señal de vida durante `SESSION_STALE_AFTER_SECONDS` (por defecto 300) la
+sesión pasa a `stale` y sus mensajes no confirmados vuelven a circular. Una sesión `stale`
+no revive: responde `410` y hay que volver a registrarse.
 
 ### `DELETE /sessions/{key}`
 Cierre limpio. Los mensajes entregados sin `ack` regresan a la bandeja de no reclamados.
