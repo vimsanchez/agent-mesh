@@ -46,5 +46,16 @@
 </div>
 {% endif %}
 
+<h2>Coordinación</h2>
+<div class="panel">
+  <a href="/admin/projects/{{ project.slug }}/threads">Hilos y mensajes</a>
+  &nbsp;·&nbsp;
+  <a href="/admin/projects/{{ project.slug }}/docs">Documentos</a>
+  <p class="dim" style="margin:.7rem 0 0; font-size:.85rem">
+    Vistas de solo lectura. El panel no envía mensajes ni aporta a documentos: eso
+    pasa por la API, que es donde el reclamo es atómico y el aislamiento se aplica.
+  </p>
+</div>
+
 <p><a href="/admin/projects">← Todos los proyectos</a></p>
 {% endblock %}

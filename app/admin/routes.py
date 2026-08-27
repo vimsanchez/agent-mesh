@@ -23,8 +23,17 @@ from app.admin.deps import (
     Db,
     redirect,
 )
-from app.db.models import AccessToken, AdminUser, AgentSession, Person, Project
-from app.services import identity
+from app.db.models import (
+    AccessToken,
+    AdminUser,
+    AgentSession,
+    Document,
+    Message,
+    Person,
+    Project,
+    Thread,
+)
+from app.services import identity, knowledge
 from app.services.errors import DomainError
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -247,6 +256,117 @@ def remove_member(
     db.commit()
     flash(request, f"'{person.display_name}' ya no es miembro de '{slug}'.")
     return redirect(f"/admin/projects/{slug}")
+
+
+# ------------------------------------------- vistas de solo lectura (SPEC §10.8)
+#
+# El panel NO envía mensajes, no reclama, no aporta y no cambia estados. Es una
+# ventana para que una persona entienda qué están haciendo los agentes. Toda
+# escritura de coordinación pasa por la API, que es donde vive el aislamiento y
+# donde el reclamo es atómico.
+
+
+@router.get("/projects/{slug}/threads", response_model=None, include_in_schema=False)
+def project_threads(
+    request: Request, db: Db, admin: ActiveAdmin, slug: str
+) -> HTMLResponse | RedirectResponse:
+    try:
+        project = identity.get_project_by_slug(db, slug)
+    except DomainError as exc:
+        flash(request, exc.detail, error=True)
+        return redirect("/admin/projects")
+
+    filas = db.execute(
+        select(Thread, func.count(Message.id))
+        .outerjoin(Message, Message.thread_id == Thread.id)
+        .where(Thread.project_id == project.id)
+        .group_by(Thread.id)
+        .order_by(Thread.updated_at.desc())
+    ).all()
+    return render(request, "threads.html", admin=admin, project=project, threads=filas)
+
+
+@router.get(
+    "/projects/{slug}/threads/{thread_id}",
+    response_model=None,
+    include_in_schema=False,
+)
+def project_thread_detail(
+    request: Request, db: Db, admin: ActiveAdmin, slug: str, thread_id: str
+) -> HTMLResponse | RedirectResponse:
+    try:
+        project = identity.get_project_by_slug(db, slug)
+    except DomainError as exc:
+        flash(request, exc.detail, error=True)
+        return redirect("/admin/projects")
+
+    thread = db.get(Thread, thread_id)
+    # La comprobación de proyecto también aquí: el panel no es una puerta trasera
+    # al aislamiento solo porque quien mira sea administrador.
+    if thread is None or thread.project_id != project.id:
+        flash(request, f"no existe ese hilo en '{slug}'", error=True)
+        return redirect(f"/admin/projects/{slug}/threads")
+
+    mensajes = list(
+        db.scalars(
+            select(Message)
+            .where(Message.thread_id == thread.id)
+            .order_by(Message.created_at, Message.id)
+        )
+    )
+    return render(
+        request,
+        "thread_detail.html",
+        admin=admin,
+        project=project,
+        thread=thread,
+        messages=mensajes,
+    )
+
+
+@router.get("/projects/{slug}/docs", response_model=None, include_in_schema=False)
+def project_docs(
+    request: Request, db: Db, admin: ActiveAdmin, slug: str
+) -> HTMLResponse | RedirectResponse:
+    try:
+        project = identity.get_project_by_slug(db, slug)
+    except DomainError as exc:
+        flash(request, exc.detail, error=True)
+        return redirect("/admin/projects")
+
+    return render(
+        request,
+        "documents.html",
+        admin=admin,
+        project=project,
+        documents=knowledge.index(db, project_id=project.id),
+    )
+
+
+@router.get("/projects/{slug}/docs/{document_id}", response_model=None, include_in_schema=False)
+def project_doc_detail(
+    request: Request, db: Db, admin: ActiveAdmin, slug: str, document_id: str
+) -> HTMLResponse | RedirectResponse:
+    try:
+        project = identity.get_project_by_slug(db, slug)
+    except DomainError as exc:
+        flash(request, exc.detail, error=True)
+        return redirect("/admin/projects")
+
+    document = db.get(Document, document_id)
+    if document is None or document.project_id != project.id:
+        flash(request, f"no existe ese documento en '{slug}'", error=True)
+        return redirect(f"/admin/projects/{slug}/docs")
+
+    return render(
+        request,
+        "document_detail.html",
+        admin=admin,
+        project=project,
+        document=document,
+        content=knowledge.current_content(db, document),
+        versions=knowledge.history_of(db, document),
+    )
 
 
 # ---------------------------------------------------------------------- personas

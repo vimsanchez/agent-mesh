@@ -324,3 +324,131 @@ def test_ninguna_contraseña_sale_por_http(client: TestClient, db: Session) -> N
         assert CONTRASEÑA not in cuerpo, ruta
         assert "argon2" not in cuerpo.lower(), ruta
         assert "password_hash" not in cuerpo, ruta
+
+
+# --------------------------------------- vistas de solo lectura (SPEC §10.8)
+
+V1 = "/api/v1"
+
+
+def _escenario_de_agentes(client: TestClient, db: Session) -> tuple[str, str]:
+    """Un proyecto con un hilo y un documento, creados por la API de agentes.
+
+    El panel se prueba sobre datos reales generados por el camino normal, no
+    insertados a mano: así también se comprueba que las dos mitades del sistema
+    ven lo mismo.
+    """
+    from app.services import identity as ident
+
+    project = ident.create_project(db, slug="proyecto-pablo", name="Pedidos")
+    victor = ident.create_person(db, email="v@e.test", display_name="victor")
+    ident.add_member(db, project=project, person=victor)
+    token = ident.issue_token(db, person=victor).plain
+    db.commit()
+
+    auth = {"Authorization": f"Bearer {token}"}
+    sesion = client.post(
+        f"{V1}/sessions", headers=auth, json={"project": "proyecto-pablo", "role": "db"}
+    ).json()
+    cab = {**auth, "X-Mesh-Session": sesion["session_key"]}
+    client.post(
+        f"{V1}/messages",
+        headers=cab,
+        json={"to": "pablo.general", "subject": "¿cursor u offset?", "body": "Cuerpo largo."},
+    )
+    client.post(
+        f"{V1}/docs/contributions",
+        headers=cab,
+        json={
+            "document_path": "20-contracts/api-orders.md",
+            "base_version": 0,
+            "intent": "create",
+            "content": "# Contrato\n\nPor cursor.",
+            "rationale": "primera versión",
+        },
+    )
+    return "proyecto-pablo", token
+
+
+def test_el_panel_muestra_los_hilos_de_los_agentes(client: TestClient, db: Session) -> None:
+    slug, _ = _escenario_de_agentes(client, db)
+    _admin_listo(db)
+    _entrar(client, "jefe@empresa-interna.test")
+
+    pagina = client.get(f"/admin/projects/{slug}/threads")
+
+    assert pagina.status_code == 200
+    assert "¿cursor u offset?" in pagina.text
+
+
+def test_el_detalle_del_hilo_muestra_el_cuerpo(client: TestClient, db: Session) -> None:
+    slug, _ = _escenario_de_agentes(client, db)
+    _admin_listo(db)
+    _entrar(client, "jefe@empresa-interna.test")
+    listado = client.get(f"/admin/projects/{slug}/threads").text
+    thread_id = re.search(r"thr_[a-f0-9]+", listado)
+    assert thread_id
+
+    pagina = client.get(f"/admin/projects/{slug}/threads/{thread_id.group(0)}")
+
+    assert "Cuerpo largo." in pagina.text
+    assert "victor.db" in pagina.text
+
+
+def test_el_panel_muestra_los_documentos_con_su_historial(
+    client: TestClient, db: Session
+) -> None:
+    slug, _ = _escenario_de_agentes(client, db)
+    _admin_listo(db)
+    _entrar(client, "jefe@empresa-interna.test")
+    listado = client.get(f"/admin/projects/{slug}/docs")
+    assert "20-contracts/api-orders.md" in listado.text
+    doc_id = re.search(r"doc_[a-f0-9]+", listado.text)
+    assert doc_id
+
+    detalle = client.get(f"/admin/projects/{slug}/docs/{doc_id.group(0)}")
+
+    assert "Por cursor." in detalle.text
+    assert "primera versión" in detalle.text, "el motivo del historial"
+    assert "victor.db" in detalle.text, "el autor"
+
+
+def test_un_hilo_de_otro_proyecto_no_se_ve_desde_el_panel(
+    client: TestClient, db: Session
+) -> None:
+    """El panel no es una puerta trasera al aislamiento solo porque quien mira
+    sea administrador."""
+    slug, _ = _escenario_de_agentes(client, db)
+    from app.services import identity as ident
+
+    otro = ident.create_project(db, slug="proyecto-luis", name="Portal")
+    db.commit()
+    _admin_listo(db)
+    _entrar(client, "jefe@empresa-interna.test")
+    listado = client.get(f"/admin/projects/{slug}/threads").text
+    thread_id = re.search(r"thr_[a-f0-9]+", listado)
+    assert thread_id
+
+    respuesta = client.get(
+        f"/admin/projects/{otro.slug}/threads/{thread_id.group(0)}",
+        follow_redirects=False,
+    )
+
+    assert respuesta.status_code == 303
+    assert respuesta.headers["location"] == f"/admin/projects/{otro.slug}/threads"
+
+
+def test_las_vistas_de_lectura_exigen_sesion(client: TestClient, db: Session) -> None:
+    slug, _ = _escenario_de_agentes(client, db)
+
+    for ruta in (f"/admin/projects/{slug}/threads", f"/admin/projects/{slug}/docs"):
+        respuesta = client.get(ruta, follow_redirects=False)
+        assert respuesta.status_code == 303, ruta
+        assert respuesta.headers["location"] == "/admin/login", ruta
+
+
+def test_el_panel_sigue_fuera_del_esquema_openapi(client: TestClient) -> None:
+    """Las vistas nuevas tampoco pertenecen al contrato de agentes."""
+    esquema = client.get("/openapi.json").json()
+
+    assert not [ruta for ruta in esquema["paths"] if ruta.startswith("/admin")]

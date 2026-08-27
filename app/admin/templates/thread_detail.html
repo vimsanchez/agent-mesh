@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ thread.subject }}{% endblock %}
+{% block body %}
+<h1>{{ thread.subject }}</h1>
+<p class="lead">
+  <span class="tag">{{ thread.status }}</span>
+  · {{ messages | length }} mensaje(s)
+  · <span class="mono dim">{{ thread.id }}</span>
+</p>
+
+{% for message in messages %}
+<div class="panel">
+  <div style="display:flex; gap:.6rem; align-items:baseline; flex-wrap:wrap">
+    <strong class="mono">{{ message.sender_address }}</strong>
+    <span class="dim">→</span>
+    <span class="mono dim">{{ message.recipient_address or 'sin destinatario' }}</span>
+    <span class="tag">{{ message.kind }}</span>
+    <span class="tag">{{ message.status }}</span>
+    <span class="dim" style="margin-left:auto; font-size:.82rem">
+      {{ message.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+    </span>
+  </div>
+  <div style="margin-top:.5rem; font-weight:600">{{ message.subject }}</div>
+  <pre style="margin:.6rem 0 0; white-space:pre-wrap; word-break:break-word;
+              font-family:ui-monospace,Menlo,monospace; font-size:.84rem;
+              color:var(--dim)">{{ message.body }}</pre>
+</div>
+{% endfor %}
+
+<p><a href="/admin/projects/{{ project.slug }}/threads">← Todos los hilos</a></p>
+{% endblock %}
