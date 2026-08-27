@@ -42,3 +42,13 @@ class UnauthorizedError(DomainError):
 
 class ValidationFailedError(DomainError):
     detail = "datos inválidos"
+
+
+class SessionGoneError(DomainError):
+    """La sesión existía pero ya no sirve: `stale` o cerrada.
+
+    Se distingue de `NotFoundError` porque la respuesta correcta del agente es
+    distinta: no "no existe", sino "vuelve a registrarte" (`api.md`, 410).
+    """
+
+    detail = "esta sesión ya no está activa; vuelve a registrarte con register"

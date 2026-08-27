@@ -7,11 +7,12 @@ token de agente. Un administrador no es automáticamente una persona.
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import enums, ids
 from app.db.base import Base, utcnow
+from app.db.types import UtcDateTime
 
 
 class AdminUser(Base):
@@ -35,8 +36,8 @@ class AdminUser(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20), default="admin")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+    last_login_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
@@ -52,7 +53,7 @@ class Person(Base):
     # Primer componente de la dirección pública `persona.rol`.
     display_name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
 
 
 class AccessToken(Base):
@@ -76,7 +77,7 @@ class AccessToken(Base):
     )
     token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     label: Mapped[str] = mapped_column(String(120), default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     # Revocar no borra: se conserva el rastro de qué token existió.
-    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime)

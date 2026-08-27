@@ -9,7 +9,6 @@ from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
-    DateTime,
     ForeignKey,
     Index,
     String,
@@ -19,6 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import enums, ids
 from app.db.base import Base, utcnow
+from app.db.types import UtcDateTime
 
 
 class Thread(Base):
@@ -42,10 +42,8 @@ class Thread(Base):
     # `resolved` no tiene escritor automático en esta etapa: un hilo aguanta
     # varias preguntas y cerrarlo con la primera respuesta sería mentir.
     status: Mapped[str] = mapped_column(String(16), default="open")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, onupdate=utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow, onupdate=utcnow)
 
 
 class Message(Base):
@@ -107,8 +105,8 @@ class Message(Base):
     claimed_by_session_id: Mapped[str | None] = mapped_column(
         ForeignKey("sessions.id", ondelete="SET NULL")
     )
-    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    claimed_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
 
 
 class MessageDelivery(Base):
@@ -130,8 +128,8 @@ class MessageDelivery(Base):
     session_id: Mapped[str] = mapped_column(
         ForeignKey("sessions.id", ondelete="CASCADE"), primary_key=True
     )
-    delivered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    acked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    delivered_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+    acked_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
 
 
 class MessageDismissal(Base):
@@ -149,4 +147,4 @@ class MessageDismissal(Base):
     session_id: Mapped[str] = mapped_column(
         ForeignKey("sessions.id", ondelete="CASCADE"), primary_key=True
     )
-    dismissed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    dismissed_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
