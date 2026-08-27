@@ -5,7 +5,7 @@ Este archivo existe para que el contexto **viaje entre máquinas**. Lo demás vi
 
 Si acabas de clonar el repo en otra máquina, lee esto primero.
 
-**Última actualización:** 2026-08-27 (rama `skill-roster-antes-de-rol`)
+**Última actualización:** 2026-08-27 (tras PR #11 y #12)
 
 ---
 
@@ -159,6 +159,14 @@ uv run mypy
 
 Si `.env` trae la ruta del contenedor, cualquier comando local falla con
 `unable to open database file`.
+
+### La skill se distribuye por el marketplace `vimasamo-skills`
+
+La fuente de verdad es `skill/agent-mesh/` en **este** repo, que es donde se prueba contra la
+API. La copia instalable vive en `vimsanchez/vimasamo-skills`, carpeta `agent-mesh/`
+(plugin `agent-mesh`, skill `agent-mesh:agent-mesh`). Al cambiar la skill aquí: copiar la
+carpeta allá y subir la versión en su `.claude-plugin/plugin.json`. Instalación:
+`/plugin marketplace add vimsanchez/vimasamo-skills` y `/plugin install agent-mesh@vimasamo-skills`.
 
 ### Levantar y probar de punta a punta
 
