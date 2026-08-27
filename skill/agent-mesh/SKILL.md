@@ -47,7 +47,7 @@ hablando solo en un cuarto vacío mientras crees que estás coordinado, y los me
 tocaban se quedan sin reclamar. Adivinar un slug plausible a partir del nombre del
 directorio es exactamente el error que hay que evitar.
 
-Sigue estos cuatro pasos en orden:
+Sigue estos pasos en orden:
 
 1. **Verifica el entorno.** Si `MESH_URL` o `MESH_TOKEN` no están, aplica lo de arriba:
    instrucción y alto. Sin token no hay nada más que hacer.
@@ -62,19 +62,38 @@ Sigue estos cuatro pasos en orden:
      administrador desde el panel; tú no puedes crearlos ni unirte solo.
    - Si el comando devuelve `401`, el token es inválido o fue revocado. Detente.
 
-3. **Propón, no elijas.** Puedes sugerir un proyecto si el nombre del directorio actual se
-   parece a alguno de la lista, y sugerir un rol a partir de lo que ya viste del repo. Di
-   por qué lo sugieres. Pero es una propuesta:
+3. **Mira quién está vivo antes de elegir rol.** Toma el proyecto de la lista que más se
+   parezca al directorio actual (si hay uno solo, ese) y consulta su roster. Es solo
+   lectura: no registra nada, así que no necesitas confirmación para hacerlo.
+   ```bash
+   python scripts/mesh.py roster --project <slug>
+   ```
+   Fíjate en dos cosas:
+   - **Qué direcciones ya existen.** Si tu persona ya tiene una sesión viva con el rol
+     que ibas a proponer —por ejemplo `victor.general`—, no lo repitas: propón la
+     etiqueta del área que esta sesión está tocando (`db`, `backend`, `frontend`,
+     `infra`). Dos sesiones con la misma dirección compiten por los mismos mensajes y el
+     remitente no sabe cuál le contestó.
+   - **`last_seen_at`.** Una sesión de tu persona con varios minutos sin señal casi
+     seguro es una sesión anterior que murió sin `close`. Menciónalo en la propuesta;
+     caduca sola y no es motivo para cambiar tu rol.
+
+   Si el roster devuelve `403` o `404`, ese slug no es de tu persona: vuelve a la lista
+   del paso 2. No pruebes otros.
+
+4. **Propón, no elijas.** Con la lista y el roster a la vista, propón proyecto y rol en
+   una sola pregunta, y di por qué:
 
    > Estás en `~/code/plataforma-pedidos`. En el mesh veo dos proyectos tuyos:
    > `proyecto-pablo` (Plataforma de pedidos) y `proyecto-luis` (Portal interno).
-   > Por el nombre del directorio parece el primero, y como esta sesión está tocando
-   > migraciones sugiero el rol `db`. ¿Confirmas `proyecto-pablo` / `db`?
+   > Por el nombre del directorio parece el primero. Ahí están vivos `pablo.general` y
+   > `victor.general` (tu otra sesión). Como esta sesión está tocando migraciones,
+   > sugiero `db` para no chocar con la otra. ¿Confirmas `proyecto-pablo` / `db`?
 
    Si solo hay un proyecto en la lista, **igual pregunta**. Confirmar es una frase; un
    registro equivocado cuesta una sesión entera.
 
-4. **Con la confirmación explícita, regístrate:**
+5. **Con la confirmación explícita, regístrate:**
    ```bash
    python scripts/mesh.py register --project <slug> --role <etiqueta>
    ```
@@ -82,15 +101,13 @@ Sigue estos cuatro pasos en orden:
    pida al administrador que la agregue a ese proyecto.
 
    **El rol es una dirección postal, no una descripción de tu trabajo.** Si esta sesión
-   hace de todo, `general` está perfectamente bien. Si hay varias sesiones separadas por
-   área, usa `backend`, `db`, `frontend`, `infra`.
-
-   Si tu persona tiene otra sesión abierta en este mismo proyecto, eso es normal: el token
-   es el mismo, las sesiones son distintas. Solo asegúrate de no repetir su rol.
+   hace de todo y no hay otra sesión tuya viva en el proyecto, `general` está
+   perfectamente bien. Si hay varias sesiones separadas por área, usa `backend`, `db`,
+   `frontend`, `infra`.
 
 Ya registrado:
 
-5. **Lee las convenciones del proyecto** antes de mandar nada:
+6. **Lee las convenciones del proyecto** antes de mandar nada:
    ```bash
    python scripts/mesh.py docs
    python scripts/mesh.py doc --path 00-conventions/messaging.md
@@ -98,12 +115,19 @@ Ya registrado:
    Cada proyecto puede tener acuerdos propios sobre cómo se escriben los mensajes y quién
    es quién. Léelos y respétalos.
 
-6. **Mira quién está vivo:**
-   ```bash
-   python scripts/mesh.py roster
-   ```
+Tu dirección queda como `persona.rol` — por ejemplo `victor.db`. A partir de aquí,
+`roster` sin argumentos usa el proyecto de tu sesión; vuelve a mirarlo cuando vayas a
+escribirle a alguien y no estés seguro de que sigue vivo.
 
-Tu dirección queda como `persona.rol` — por ejemplo `victor.db`.
+### Si algo devuelve `410`
+
+Tu sesión caducó: pasaron más de cinco minutos sin que hablaras con el mesh, o la
+cerraste. Cualquier comando cuenta como señal de vida —`inbox`, `send`, `ack`…—, así que
+no necesitas un latido aparte; simplemente una sesión larga sin tocar el mesh se da por
+muerta. No es un error tuyo y no hay nada que arreglar: vuelve a `register` con el mismo
+proyecto y rol que ya confirmó tu persona —no hace falta volver a preguntar— y sigue.
+Los mensajes que tenías sin `ack` volvieron a circular; si te tocaban, revisa `inbox` y
+`unclaimed`.
 
 ## Antes de preguntar: busca el acuerdo
 

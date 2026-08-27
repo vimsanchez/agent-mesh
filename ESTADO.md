@@ -5,7 +5,7 @@ Este archivo existe para que el contexto **viaje entre máquinas**. Lo demás vi
 
 Si acabas de clonar el repo en otra máquina, lee esto primero.
 
-**Última actualización:** 2026-08-27 (tras PR #10)
+**Última actualización:** 2026-08-27 (tras PR #11 y #12)
 
 ---
 
@@ -15,14 +15,18 @@ Los **ocho pasos** del orden de implementación de `SPEC.md` §10 están impleme
 las **siete pruebas críticas** del §11 pasan.
 
 ```
-pytest        272 passed
+pytest        274 passed
 ruff / format limpio
 mypy strict   sin fallos en app/ (38 archivos)
 rutas de API  17, exactamente las del §8
 ```
 
-La skill de `skill/agent-mesh/` funciona contra el servicio **sin una sola
-modificación**. Es el test de aceptación, no un artefacto que se ajuste al servicio.
+La skill de `skill/agent-mesh/` es el **test de aceptación** del servicio, no un
+artefacto que se ajuste a él. Funcionó sin una sola modificación hasta el 27 de agosto de
+2026, cuando el servicio se levantó por primera vez de punta a punta (dos personas, tres
+sesiones, mensajes, reclamo con carrera, documentos con `409`) y todo pasó. Ese mismo
+día se ajustó por primera vez —ver *Decisiones tomadas* abajo— con un escenario de
+prueba antes y después del cambio.
 
 ### Todo el código está en `main` (desde PR #10)
 
@@ -32,52 +36,78 @@ Los ocho pasos se desarrollaron en PRs **apilados** (`#1 paso-1` ← `#2 paso-2`
 de que esa rama recibiera su propio merge. Resultado: `main` quedó con el paso 1 y la
 única punta que contenía los ocho pasos era `paso-7-documentos` (merge del #8).
 
-Se corrigió con **PR #10** (`paso-7-documentos` → `main`, sin conflictos, 272 pruebas en
-verde sobre el árbol fusionado). Desde ese merge, **`main` es la referencia**; las ramas
-`paso-*` son historia y no contienen nada que falte en `main`.
+Se corrigió con **PR #10** (`paso-7-documentos` → `main`, sin conflictos). Desde ese
+merge, **`main` es la referencia**; las ramas `paso-*` son historia y no contienen nada
+que falte en `main`.
 
 Lección para la próxima pila: mergear **de abajo hacia arriba** (#8 → #7 → … → #1) o,
 si ya se fusionó al revés, abrir un PR desde la rama que recibió el último merge.
 
 ---
 
+## Decisiones tomadas el 27 de agosto de 2026
+
+Las dos salieron de levantar el servicio y correr la skill contra él, no de leer código.
+
+### La skill consulta el roster **antes** de proponer rol
+
+Antes registraba en su paso 4 y miraba el roster en el 6, así que el agente proponía un
+rol a ciegas aunque el texto le pidiera "no repetir el rol" de otra sesión. En el
+escenario de prueba (repo genérico, `victor.general` ya vivo), el agente con la skill
+vieja propuso `general` y escribió literalmente que *"el roster requiere sesión
+registrada"*. El servidor nunca exigió eso —`GET /projects/{slug}/roster` solo pide el
+token—; el que lo exigía era `mesh.py`, que sacaba el slug de la sesión guardada.
+
+Cambio: `mesh.py roster --project <slug>` (opcional; sin flag se comporta igual que
+antes), y los pasos de `SKILL.md` reordenados: entorno → `projects` → `roster` del
+candidato → **una sola** confirmación de proyecto y rol → `register` → convenciones. Se
+añadió también qué hacer ante un `410`, que solo estaba en `api.md`.
+
+Esto baja la frecuencia del duplicado `victor.general × 2`; **no** elimina la necesidad
+del reclamo atómico, porque siguen existiendo otros caminos (sesión huérfana que aún no
+caduca, dos worktrees a propósito).
+
+### Latido implícito
+
+Solo `POST /sessions/{key}/heartbeat` refrescaba `last_seen_at`, y la skill nunca lo
+menciona —a propósito: le pedimos al agente que no haga polling, y pedirle un ritual
+aparte es frágil—. Consecuencia: un agente que revisaba el inbox "en pausas naturales"
+quedaba `stale` a los 5 minutos y recibía `410` en la siguiente llamada.
+
+Ahora `current_session` (`app/security/deps.py`) registra señal de vida en **toda**
+petición con sesión válida, en su propia transacción para no depender del commit del
+handler. Una sesión ya `stale` sigue dando `410`: revivirla dejaría en el aire los
+mensajes que ya volvieron a circular. El endpoint explícito se conserva.
+
+---
+
 ## Pendiente de decisión
 
-Tres cosas abiertas que **no están registradas en el código**.
+Una cosa abierta que **no está registrada en el código**.
 
-### 1. `admin_users.role` con valores `owner | admin`
+### `admin_users.role` con valores `owner | admin`
 
 `SPEC.md` §9 pide que la tabla y el campo existan desde el día uno pero no fija los
 valores. Los elegí al implementar el paso 2 y quedó sin confirmar. Nadie lee ese campo
 todavía, así que cambiarlo sigue siendo barato.
 
-### 2. Un hueco en `SKILL.md`, no en el servicio
+---
 
-La skill registra la sesión en su **paso 4** y consulta el `roster` en el **paso 6**. O
-sea que el agente **no puede ver quién está conectado antes de elegir su rol**, aunque
-el mismo documento le pida *"asegúrate de no repetir su rol"*.
+## Despliegue
 
-Eso hace más probable que dos sesiones acaben con la misma dirección
-(`victor.general` × 2). Se arregla reordenando los pasos de la skill.
-
-Importa por dos motivos:
-
-- Es la razón principal por la que el inbox pasa por el reclamo atómico. Corregir la
-  skill no elimina esa necesidad —hay otros caminos al duplicado, como una sesión
-  huérfana que aún no caduca— pero baja mucho la frecuencia.
-- La skill no se ha tocado en todo el proyecto, a propósito. Modificarla es una
-  decisión, no algo que hacer de paso.
-
-### 3. El túnel de Cloudflare no está montado
-
-El servicio publica en `127.0.0.1:8000` y está verificado que **no** responde en la IP
-de LAN, como exige `SPEC.md` §9. Pero apuntar el túnel sigue pendiente, así que el
-panel no es accesible desde fuera de la máquina.
-
-Recordatorio del §9: el panel se protege con usuario y contraseña propios, y eso
-*reemplaza* a Cloudflare Access. Eso solo es aceptable mientras el túnel sea la única
-puerta. `tests/test_despliegue.py` verifica la parte del compose; el túnel en sí no lo
-puede comprobar una prueba.
+- Contenedor publicado en `127.0.0.1:8840` —el 8000 es el puerto por defecto de uvicorn
+  y en la máquina de despliegue hay decenas de servicios así; el segmento 8840–8849 queda
+  para Agent Mesh—. Verificado que **no** responde en la IP de LAN (`SPEC.md` §9).
+- **Túnel de Cloudflare montado el 27 de agosto de 2026**: `https://mesh.agoconsultores.dev`.
+  Verificado desde fuera: `/healthz` 200, `/admin/login` 200 y la API contesta con token.
+  Ese es el `MESH_URL` que instalan las personas; `PUBLIC_SERVICE_DOMAIN` en `.env` ya
+  apunta ahí (y **no** tiene relación con `ADMIN_EMAIL_DOMAIN`, regla 6).
+- Recordatorio del §9: el panel se protege con usuario y contraseña propios, y eso
+  *reemplaza* a Cloudflare Access. Es aceptable solo mientras el túnel sea la única
+  puerta. `tests/test_despliegue.py` verifica la parte del compose; el túnel en sí no lo
+  puede comprobar una prueba.
+- `GET /` devuelve `404`: no hay raíz, el panel vive en `/admin`. Decidir si se quiere
+  una redirección.
 
 ---
 
@@ -130,19 +160,33 @@ uv run mypy
 Si `.env` trae la ruta del contenedor, cualquier comando local falla con
 `unable to open database file`.
 
+### La skill se distribuye por el marketplace `vimasamo-skills`
+
+La fuente de verdad es `skill/agent-mesh/` en **este** repo, que es donde se prueba contra la
+API. La copia instalable vive en `vimsanchez/vimasamo-skills`, carpeta `agent-mesh/`
+(plugin `agent-mesh`, skill `agent-mesh:agent-mesh`). Al cambiar la skill aquí: copiar la
+carpeta allá y subir la versión en su `.claude-plugin/plugin.json`. Instalación:
+`/plugin marketplace add vimsanchez/vimasamo-skills` y `/plugin install agent-mesh@vimasamo-skills`.
+
 ### Levantar y probar de punta a punta
 
 ```bash
-cp .env.example .env      # ajusta ADMIN_EMAIL_DOMAIN y BOOTSTRAP_ADMIN_EMAIL
+cp .env.example .env      # ajusta ADMIN_EMAIL_DOMAIN, BOOTSTRAP_ADMIN_EMAIL y fija SECRET_KEY
 docker compose up -d --build
 docker compose logs mesh | grep -A3 "ADMINISTRADOR INICIAL"   # la contraseña, una sola vez
 ```
+
+La contraseña de bootstrap sale **solo en el log del primer arranque** con la base vacía.
+Si recreas el contenedor (`up -d` tras cambiar `.env` o el puerto), el nuevo log dice
+`bootstrap: ya existe al menos un administrador` y no la repite: usa la que ya cambiaste
+en `/admin/password`. Si se perdió, la salida es borrar el volumen (`down -v`) y arrancar
+de cero. Sin `SECRET_KEY` en `.env`, la sesión del panel se cierra en cada reinicio.
 
 Luego, con dos agentes en **directorios distintos** (`mesh.py` guarda su sesión en
 `./.agent-mesh/` y dos sesiones en el mismo cwd se pisan):
 
 ```bash
-export MESH_URL=http://127.0.0.1:8000 MESH_TOKEN=<token emitido en /admin>
+export MESH_URL=http://127.0.0.1:8840 MESH_TOKEN=<token emitido en /admin>
 cd /tmp/agente-a && python .../skill/agent-mesh/scripts/mesh.py register --project <slug> --role db
 ```
 

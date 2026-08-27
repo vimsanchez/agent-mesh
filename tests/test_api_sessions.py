@@ -382,3 +382,53 @@ def test_un_rol_vacio_es_rechazado_con_una_sugerencia(client: TestClient, mundo:
 
     assert respuesta.status_code == 422
     assert "general" in respuesta.json()["detail"]
+
+
+# ------------------------------------------------------- latido implícito
+
+
+def _last_seen(session_key: str) -> object:
+    with SessionLocal() as db:
+        agent_session = db.scalar(
+            select(AgentSession).where(AgentSession.session_key == session_key)
+        )
+        assert agent_session is not None
+        return agent_session.last_seen_at
+
+
+def test_cualquier_peticion_con_sesion_cuenta_como_latido(
+    client: TestClient, mundo: Mundo
+) -> None:
+    """Un agente que revisa su inbox o manda un mensaje está vivo; exigirle además
+    un `heartbeat` aparte es pedirle que recuerde un ritual que no aporta nada.
+    """
+    datos = _registrar(client, mundo, "victor", "proyecto-pablo", "db")
+    _envejecer(datos["session_key"], SETTINGS.session_stale_after_seconds - 10)
+    antes = _last_seen(datos["session_key"])
+
+    respuesta = client.get(
+        f"{V1}/unclaimed",
+        headers={**mundo.auth("victor"), "X-Mesh-Session": datos["session_key"]},
+    )
+
+    assert respuesta.status_code == 200
+    despues = _last_seen(datos["session_key"])
+    assert despues > antes  # type: ignore[operator]
+    assert utcnow() - despues < timedelta(seconds=5)  # type: ignore[operator]
+
+
+def test_una_sesion_stale_no_revive_con_una_peticion(client: TestClient, mundo: Mundo) -> None:
+    """El latido implícito no puede ser una puerta trasera para revivir sesiones
+    que ya soltaron sus mensajes: sigue siendo 410 y a registrarse de nuevo.
+    """
+    datos = _registrar(client, mundo, "victor", "proyecto-pablo", "db")
+    _envejecer(datos["session_key"], SETTINGS.session_stale_after_seconds + 60)
+    client.get(f"{V1}/projects/proyecto-pablo/roster", headers=mundo.auth("victor"))
+
+    respuesta = client.get(
+        f"{V1}/unclaimed",
+        headers={**mundo.auth("victor"), "X-Mesh-Session": datos["session_key"]},
+    )
+
+    assert respuesta.status_code == 410
+    assert "vuelve a registrarte" in respuesta.json()["detail"]

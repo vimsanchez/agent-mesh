@@ -223,9 +223,20 @@ def heartbeat(
     agent_session = by_key(db, person=person, session_key=session_key)
     if agent_session.status != "active":
         raise SessionGoneError
+    touch(db, agent_session)
+    return agent_session
+
+
+def touch(db: Session, agent_session: AgentSession) -> None:
+    """Registra señal de vida. Es lo que hace `heartbeat`, y también lo que hace
+    **cualquier petición** que llegue con una sesión válida (ver `security/deps`).
+
+    Un agente que revisa su inbox o manda un mensaje está vivo; exigirle además un
+    latido aparte es pedirle que recuerde un ritual, y los agentes lo olvidan. El
+    endpoint explícito se queda para quien no tenga nada más que decir.
+    """
     agent_session.last_seen_at = utcnow()
     db.flush()
-    return agent_session
 
 
 def close(db: Session, *, person: Person, session_key: str) -> AgentSession:
