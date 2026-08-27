@@ -22,6 +22,9 @@ dev = [
     "httpx>=0.28",
     "ruff>=0.8",
     "mypy>=1.13",
+    # Las pruebas de despliegue parsean compose.yaml.
+    "pyyaml>=6",
+    "types-pyyaml>=6",
 ]
 
 [build-system]

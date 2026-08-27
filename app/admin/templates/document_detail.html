@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ document.path }}{% endblock %}
+{% block body %}
+<h1 class="mono">{{ document.path }}</h1>
+<p class="lead">{{ document.title }} · v{{ document.current_version }} · <span class="tag">{{ document.status }}</span></p>
+
+<h2>Contenido vigente</h2>
+<div class="panel">
+  <pre style="margin:0; white-space:pre-wrap; word-break:break-word;
+              font-family:ui-monospace,Menlo,monospace; font-size:.84rem">{{ content }}</pre>
+</div>
+
+<h2>Historial</h2>
+<div class="panel">
+  <table>
+    <tr><th>Versión</th><th>Intención</th><th>Autor</th><th>Motivo</th><th>Fecha</th></tr>
+    {% for version in versions %}
+    <tr>
+      <td>v{{ version.version }}</td>
+      <td><span class="tag">{{ version.intent }}</span></td>
+      <td class="mono dim">{{ version.author_address }}</td>
+      <td class="dim">{{ version.rationale }}</td>
+      <td class="dim">{{ version.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="dim" style="margin:.9rem 0 0; font-size:.85rem">
+    El historial es inmutable: cada aportación añade una versión y ninguna
+    reescribe las anteriores.
+  </p>
+</div>
+
+<p><a href="/admin/projects/{{ project.slug }}/docs">← Todos los documentos</a></p>
+{% endblock %}

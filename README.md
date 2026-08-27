@@ -9,7 +9,33 @@ otra por Telegram, y esa se lo da a su agente. Este servicio elimina ese acarreo
 
 ## Estado
 
-En construcción. El diseño está cerrado; la implementación sigue el orden de `SPEC.md` §10.
+Los ocho pasos de `SPEC.md` §10 están implementados, y las siete pruebas críticas del
+§11 pasan. La skill del agente funciona contra el servicio **sin modificaciones**.
+
+## API de agentes
+
+Prefijo `/api/v1`, autenticación `Authorization: Bearer <token-de-persona>`.
+
+| Área | Rutas |
+|---|---|
+| Proyectos | `GET /projects` · `GET /projects/{slug}/roster` |
+| Sesiones | `POST /sessions` · `POST /sessions/{key}/heartbeat` · `DELETE /sessions/{key}` |
+| Mensajes | `POST /messages` · `GET /inbox?wait=N` · `POST /messages/{id}/ack` · `POST /messages/{id}/progress` · `GET /threads/{id}` |
+| No reclamados | `GET /unclaimed` · `POST /messages/{id}/claim` · `POST /messages/{id}/dismiss` |
+| Conocimiento | `GET /projects/{slug}/docs` · `GET /docs?path=…` · `POST /docs/contributions` · `GET /docs/{id}/versions` |
+
+**No hay `POST /projects` ni auto-inscripción**, y no la habrá: los proyectos y las
+membresías se crean solo desde el panel. Hay una prueba que recorre el esquema OpenAPI
+para que nadie lo agregue por descuido.
+
+## Direcciones
+
+Dos formas, jerárquicas:
+
+| Forma | Significado |
+|---|---|
+| `victor.db` | El **buzón del rol**: cualquier sesión viva con ese rol. Es la dirección estable y la que se cita en los acuerdos. |
+| `victor.db.a7f3` | Esa **sesión concreta**. Cambia en cada `register`, así que no sirve para apuntarla a largo plazo. |
 
 ## Documentos
 
@@ -36,6 +62,20 @@ docker compose up --build
 ```
 
 La contraseña del admin de bootstrap se imprime **una sola vez** en el log de arranque.
+
+## Panel de administración
+
+En `/admin`. Server-rendered, sesión por cookie. Crea proyectos y personas, asigna
+membresías, emite y revoca tokens, y ofrece **vistas de solo lectura** de hilos,
+mensajes y documentos con su historial.
+
+El panel no envía mensajes, no reclama y no aporta: toda escritura de coordinación pasa
+por la API, que es donde el reclamo es atómico.
+
+> **Seguridad del despliegue.** El panel se protege con usuario y contraseña propios, y
+> eso *reemplaza* a Cloudflare Access. Es aceptable **solo** mientras el túnel sea el
+> único camino de entrada: `compose.yaml` publica el puerto en `127.0.0.1` y nunca en la
+> LAN. `tests/test_despliegue.py` lo verifica parseando el compose.
 
 ## Desarrollo
 

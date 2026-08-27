@@ -81,6 +81,21 @@ def current_content(db: Session, document: Document) -> str:
     return version.content if version is not None else ""
 
 
+def history_of(db: Session, document: Document) -> list[DocumentVersion]:
+    """Historial de un documento ya validado por quien llama.
+
+    Existe para el panel, que resuelve la pertenencia por proyecto y no por
+    sesión de agente. La validación no se salta: se hace antes, en el handler.
+    """
+    return list(
+        db.scalars(
+            select(DocumentVersion)
+            .where(DocumentVersion.document_id == document.id)
+            .order_by(DocumentVersion.version)
+        )
+    )
+
+
 def history(
     db: Session, *, agent_session: AgentSession, document_id: str
 ) -> tuple[Document, list[DocumentVersion]]:
@@ -89,14 +104,7 @@ def history(
     document = db.get(Document, document_id)
     if document is None or document.project_id != agent_session.project_id:
         raise NotFoundError(f"no existe el documento '{document_id}' en este proyecto")
-    versiones = list(
-        db.scalars(
-            select(DocumentVersion)
-            .where(DocumentVersion.document_id == document.id)
-            .order_by(DocumentVersion.version)
-        )
-    )
-    return document, versiones
+    return document, history_of(db, document)
 
 
 # ------------------------------------------------------- aplicar la aportación
