@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Personas{% endblock %}
+{% block body %}
+<h1>Personas</h1>
+<p class="lead">
+  Una persona es el humano dueño de una cuenta de agente. Su nombre es el primer
+  componente de la dirección pública <code>persona.rol</code>.
+</p>
+
+<div class="panel">
+  <form method="post" action="/admin/people">
+    <div class="row">
+      <div>
+        <label for="display_name">Nombre</label>
+        <input id="display_name" name="display_name" type="text" required placeholder="victor"
+               pattern="[a-z0-9]+([_-][a-z0-9]+)*">
+      </div>
+      <div>
+        <label for="email">Correo</label>
+        <input id="email" name="email" type="email" required placeholder="victor@ejemplo.com">
+      </div>
+      <div><button type="submit">Dar de alta</button></div>
+    </div>
+    <p class="dim" style="margin:.7rem 0 0; font-size:.85rem">
+      Sin puntos en el nombre: el punto es lo que separa persona de rol.
+      Este correo no tiene relación con el dominio del panel.
+    </p>
+  </form>
+</div>
+
+<div class="panel">
+  {% if people %}
+  <table>
+    <tr><th>Nombre</th><th>Correo</th><th>Proyectos</th><th>Tokens activos</th></tr>
+    {% for person, projects, activos in people %}
+    <tr>
+      <td><a href="/admin/people/{{ person.id }}" class="mono">{{ person.display_name }}</a></td>
+      <td class="dim">{{ person.email }}</td>
+      <td class="dim">
+        {% if projects %}{{ projects | map(attribute='slug') | join(', ') }}{% else %}—{% endif %}
+      </td>
+      <td class="dim">{{ activos }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="empty">Todavía no hay personas.</div>
+  {% endif %}
+</div>
+{% endblock %}
