@@ -83,26 +83,31 @@ mensajes que ya volvieron a circular. El endpoint explícito se conserva.
 
 ## Pendiente de decisión
 
-Dos cosas abiertas que **no están registradas en el código**.
+Una cosa abierta que **no está registrada en el código**.
 
-### 1. `admin_users.role` con valores `owner | admin`
+### `admin_users.role` con valores `owner | admin`
 
 `SPEC.md` §9 pide que la tabla y el campo existan desde el día uno pero no fija los
 valores. Los elegí al implementar el paso 2 y quedó sin confirmar. Nadie lee ese campo
 todavía, así que cambiarlo sigue siendo barato.
 
-### 2. El túnel de Cloudflare no está montado
+---
 
-El servicio publica en `127.0.0.1:8840` —el 8000 es el puerto por defecto de uvicorn y
-en la máquina de despliegue hay decenas de servicios así; el segmento 8840–8849 queda
-para Agent Mesh— y está verificado que **no** responde en la IP de LAN, como exige
-`SPEC.md` §9. Pero apuntar el túnel sigue pendiente, así que el panel no es accesible
-desde fuera de la máquina.
+## Despliegue
 
-Recordatorio del §9: el panel se protege con usuario y contraseña propios, y eso
-*reemplaza* a Cloudflare Access. Eso solo es aceptable mientras el túnel sea la única
-puerta. `tests/test_despliegue.py` verifica la parte del compose; el túnel en sí no lo
-puede comprobar una prueba.
+- Contenedor publicado en `127.0.0.1:8840` —el 8000 es el puerto por defecto de uvicorn
+  y en la máquina de despliegue hay decenas de servicios así; el segmento 8840–8849 queda
+  para Agent Mesh—. Verificado que **no** responde en la IP de LAN (`SPEC.md` §9).
+- **Túnel de Cloudflare montado el 27 de agosto de 2026**: `https://mesh.agoconsultores.dev`.
+  Verificado desde fuera: `/healthz` 200, `/admin/login` 200 y la API contesta con token.
+  Ese es el `MESH_URL` que instalan las personas; `PUBLIC_SERVICE_DOMAIN` en `.env` ya
+  apunta ahí (y **no** tiene relación con `ADMIN_EMAIL_DOMAIN`, regla 6).
+- Recordatorio del §9: el panel se protege con usuario y contraseña propios, y eso
+  *reemplaza* a Cloudflare Access. Es aceptable solo mientras el túnel sea la única
+  puerta. `tests/test_despliegue.py` verifica la parte del compose; el túnel en sí no lo
+  puede comprobar una prueba.
+- `GET /` devuelve `404`: no hay raíz, el panel vive en `/admin`. Decidir si se quiere
+  una redirección.
 
 ---
 
