@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Agent Mesh{% endblock %} · Agent Mesh</title>
+<style>
+  :root {
+    --bg: #10131a; --panel: #171b24; --line: #262c3a;
+    --text: #e6e9ef; --dim: #9aa3b2; --accent: #6ea8fe;
+    --danger: #f2777a; --ok: #7ec699;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  header {
+    display: flex; align-items: baseline; gap: 1.5rem; flex-wrap: wrap;
+    padding: .9rem 1.5rem; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  header .brand { font-weight: 650; letter-spacing: -.01em; }
+  header nav { display: flex; gap: 1.1rem; }
+  header .who { margin-left: auto; color: var(--dim); font-size: .875rem; }
+  main { max-width: 62rem; margin: 0 auto; padding: 1.75rem 1.5rem 4rem; }
+  h1 { font-size: 1.3rem; margin: 0 0 .35rem; letter-spacing: -.015em; }
+  h2 { font-size: 1rem; margin: 2rem 0 .6rem; color: var(--dim);
+       text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+  p.lead { color: var(--dim); margin: 0 0 1.5rem; }
+  .panel { background: var(--panel); border: 1px solid var(--line);
+           border-radius: 8px; padding: 1.1rem 1.25rem; margin-bottom: 1.25rem; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: .55rem .6rem; border-bottom: 1px solid var(--line); }
+  th { color: var(--dim); font-size: .78rem; text-transform: uppercase;
+       letter-spacing: .05em; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  td.right, th.right { text-align: right; }
+  form.inline { display: inline; }
+  label { display: block; font-size: .82rem; color: var(--dim); margin-bottom: .25rem; }
+  input[type=text], input[type=email], input[type=password] {
+    width: 100%; padding: .5rem .6rem; background: #0d1017; color: var(--text);
+    border: 1px solid var(--line); border-radius: 6px; font: inherit;
+  }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .row { display: flex; gap: .75rem; flex-wrap: wrap; align-items: flex-end; }
+  .row > div { flex: 1 1 12rem; }
+  button {
+    padding: .5rem .95rem; border-radius: 6px; border: 1px solid var(--accent);
+    background: var(--accent); color: #0d1017; font: inherit; font-weight: 600;
+    cursor: pointer;
+  }
+  button.ghost { background: transparent; color: var(--dim); border-color: var(--line); }
+  button.ghost:hover { color: var(--text); }
+  button.danger { background: transparent; color: var(--danger); border-color: var(--line); }
+  .flash { border-radius: 6px; padding: .7rem .9rem; margin-bottom: 1.25rem;
+           border: 1px solid; font-size: .9rem; }
+  .flash.error { color: var(--danger); border-color: #4a2b2e; background: #241a1c; }
+  .flash.ok { color: var(--ok); border-color: #2b4a38; background: #1a241e; }
+  code, .mono { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: .875em; }
+  .secret { display: block; padding: .8rem .9rem; background: #0d1017;
+            border: 1px dashed var(--accent); border-radius: 6px; word-break: break-all; }
+  .dim { color: var(--dim); }
+  .empty { color: var(--dim); padding: .8rem .6rem; font-style: italic; }
+  .tag { display: inline-block; padding: .1rem .45rem; border-radius: 4px;
+         border: 1px solid var(--line); font-size: .75rem; color: var(--dim); }
+</style>
+</head>
+<body>
+{% if admin %}
+<header>
+  <span class="brand">Agent Mesh</span>
+  <nav>
+    <a href="/admin">Resumen</a>
+    <a href="/admin/projects">Proyectos</a>
+    <a href="/admin/people">Personas</a>
+  </nav>
+  <span class="who">
+    {{ admin.email }} <span class="tag">{{ admin.role }}</span>
+    · <a href="/admin/logout">salir</a>
+  </span>
+</header>
+{% endif %}
+<main>
+  {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+  {% if notice %}<div class="flash ok">{{ notice }}</div>{% endif %}
+  {% block body %}{% endblock %}
+</main>
+</body>
+</html>

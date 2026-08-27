@@ -12,6 +12,7 @@ dependencies = [
     "argon2-cffi>=23.1",
     "jinja2>=3.1",
     "python-multipart>=0.0.19",
+    "itsdangerous>=2.2",
 ]
 
 [dependency-groups]
@@ -21,6 +22,9 @@ dev = [
     "httpx>=0.28",
     "ruff>=0.8",
     "mypy>=1.13",
+    # Las pruebas de despliegue parsean compose.yaml.
+    "pyyaml>=6",
+    "types-pyyaml>=6",
 ]
 
 [build-system]

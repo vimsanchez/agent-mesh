@@ -36,6 +36,12 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./mesh.db"
     bootstrap_admin_email: str
+
+    # SPEC §4.1 no la lista, pero un panel protegido por cookie necesita firmar
+    # esa cookie con algo. Si se deja vacía se genera una al azar en cada
+    # arranque: seguro, pero cierra la sesión de los administradores en cada
+    # reinicio. En despliegue conviene fijarla.
+    secret_key: str = ""
     longpoll_max_seconds: int = 30
     session_stale_after_seconds: int = 300
     log_level: str = "INFO"

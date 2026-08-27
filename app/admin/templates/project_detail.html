@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ project.slug }}{% endblock %}
+{% block body %}
+<h1 class="mono">{{ project.slug }}</h1>
+<p class="lead">{{ project.name }}{% if project.description %} — {{ project.description }}{% endif %}</p>
+
+<h2>Miembros</h2>
+<div class="panel">
+  {% if members %}
+  <table>
+    <tr><th>Persona</th><th>Correo</th><th class="right"></th></tr>
+    {% for person in members %}
+    <tr>
+      <td class="mono">{{ person.display_name }}</td>
+      <td class="dim">{{ person.email }}</td>
+      <td class="right">
+        <form class="inline" method="post"
+              action="/admin/projects/{{ project.slug }}/members/{{ person.id }}/remove">
+          <button class="danger" type="submit">Quitar</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="empty">Nadie es miembro todavía. Sin miembros, ningún agente puede registrarse.</div>
+  {% endif %}
+</div>
+
+{% if candidates %}
+<div class="panel">
+  <form method="post" action="/admin/projects/{{ project.slug }}/members">
+    <div class="row">
+      <div>
+        <label for="person_id">Agregar persona</label>
+        <select id="person_id" name="person_id" required
+                style="width:100%;padding:.5rem .6rem;background:#0d1017;color:var(--text);border:1px solid var(--line);border-radius:6px;font:inherit">
+          {% for person in candidates %}
+          <option value="{{ person.id }}">{{ person.display_name }} — {{ person.email }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div><button type="submit">Agregar</button></div>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+<h2>Coordinación</h2>
+<div class="panel">
+  <a href="/admin/projects/{{ project.slug }}/threads">Hilos y mensajes</a>
+  &nbsp;·&nbsp;
+  <a href="/admin/projects/{{ project.slug }}/docs">Documentos</a>
+  <p class="dim" style="margin:.7rem 0 0; font-size:.85rem">
+    Vistas de solo lectura. El panel no envía mensajes ni aporta a documentos: eso
+    pasa por la API, que es donde el reclamo es atómico y el aislamiento se aplica.
+  </p>
+</div>
+
+<p><a href="/admin/projects">← Todos los proyectos</a></p>
+{% endblock %}

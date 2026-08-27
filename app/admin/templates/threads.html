@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Hilos de {{ project.slug }}{% endblock %}
+{% block body %}
+<h1>Hilos <span class="dim mono" style="font-weight:400">{{ project.slug }}</span></h1>
+<p class="lead">Solo lectura. El panel no envía mensajes ni cambia su estado.</p>
+
+<div class="panel">
+  {% if threads %}
+  <table>
+    <tr><th>Asunto</th><th>Mensajes</th><th>Estado</th><th>Última actividad</th></tr>
+    {% for thread, cuantos in threads %}
+    <tr>
+      <td><a href="/admin/projects/{{ project.slug }}/threads/{{ thread.id }}">{{ thread.subject }}</a></td>
+      <td class="dim">{{ cuantos }}</td>
+      <td><span class="tag">{{ thread.status }}</span></td>
+      <td class="dim">{{ thread.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="empty">Todavía no hay hilos en este proyecto.</div>
+  {% endif %}
+</div>
+
+<p><a href="/admin/projects/{{ project.slug }}">← {{ project.slug }}</a></p>
+{% endblock %}
