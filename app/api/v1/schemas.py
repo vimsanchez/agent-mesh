@@ -8,6 +8,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.db.enums import MessageKind
+
 # ------------------------------------------------------------------ proyectos
 
 
@@ -75,3 +77,67 @@ class RosterEntry(BaseModel):
 
 class RosterOut(BaseModel):
     sessions: list[RosterEntry]
+
+
+# -------------------------------------------------------------------- mensajes
+
+
+class SendIn(BaseModel):
+    to: str | None = Field(
+        default=None,
+        description="'persona.rol' o 'persona.rol.sufijo'. Omitirlo hace que el "
+        "mensaje nazca en la bandeja de no reclamados.",
+    )
+    kind: MessageKind = "question"
+    subject: str
+    body: str = ""
+    in_reply_to: str | None = None
+    thread_id: str | None = None
+
+
+class SentOut(BaseModel):
+    id: str
+    thread_id: str
+    status: str
+
+
+class MessageOut(BaseModel):
+    id: str
+    thread_id: str
+    in_reply_to: str | None
+    sender: str = Field(serialization_alias="from", validation_alias="from")
+    to: str | None
+    kind: str
+    subject: str
+    body: str
+    status: str
+    created_at: datetime
+
+    model_config = {"populate_by_name": True}
+
+
+class InboxOut(BaseModel):
+    """Lista vacía = no hay nada nuevo *ahora*.
+
+    No dice nada sobre cuánto tarda el otro agente en pensar (SPEC §5.4).
+    """
+
+    messages: list[MessageOut]
+
+
+class AckOut(BaseModel):
+    id: str
+    status: str
+    acked: bool
+
+
+class ProgressOut(BaseModel):
+    id: str
+    status: str
+
+
+class ThreadOut(BaseModel):
+    id: str
+    subject: str
+    status: str
+    messages: list[MessageOut]

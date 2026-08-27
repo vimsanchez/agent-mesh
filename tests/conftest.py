@@ -17,6 +17,9 @@ os.environ["ADMIN_EMAIL_DOMAIN"] = "empresa-interna.test"
 os.environ["PUBLIC_SERVICE_DOMAIN"] = "mesh.otrodominio.test"
 os.environ["BOOTSTRAP_ADMIN_EMAIL"] = "admin@empresa-interna.test"
 os.environ["SECRET_KEY"] = "clave-de-pruebas-no-secreta"
+# Tope de long polling bajo: lo que se prueba es que el tope MANDA, no cuánto
+# vale. Con los 30 s de producción, una sola prueba se llevaría media suite.
+os.environ["LONGPOLL_MAX_SECONDS"] = "3"
 os.environ["LOG_LEVEL"] = "WARNING"
 
 import pytest  # noqa: E402
