@@ -1,0 +1,14 @@
+.git/
+.venv/
+.agent-mesh/
+.env
+*.db
+*.db-*
+__pycache__/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+tests/
+skill/
+*.md
+!README.md
