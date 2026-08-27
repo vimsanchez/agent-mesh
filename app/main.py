@@ -105,6 +105,15 @@ def create_app() -> FastAPI:
 
     register_error_handlers(app)
 
+    @app.get("/", include_in_schema=False)
+    async def _root() -> RedirectResponse:
+        """La raíz no es nada: quien llega con la URL pelona va al panel.
+
+        Temporal (307) a propósito: si algún día la raíz se convierte en una
+        página, no queremos que los navegadores tengan cacheada la redirección.
+        """
+        return RedirectResponse(url="/admin", status_code=307)
+
     app.include_router(health_router)
     app.include_router(api_v1_router)
     app.include_router(admin_router)
