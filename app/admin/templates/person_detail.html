@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ person.display_name }}{% endblock %}
+{% block body %}
+<h1 class="mono">{{ person.display_name }}</h1>
+<p class="lead">{{ person.email }}</p>
+
+{% if new_token %}
+<div class="panel" style="border-color: var(--accent)">
+  <strong>Token emitido. Se muestra una sola vez.</strong>
+  <p class="dim" style="margin:.5rem 0">
+    No hay forma de recuperarlo después: si se pierde, revócalo y emite otro.
+    Pásalo por un canal seguro y que se instale como variable de entorno
+    <code>MESH_TOKEN</code>, nunca en un archivo del repo ni en un chat.
+  </p>
+  <code class="secret">{{ new_token }}</code>
+</div>
+{% endif %}
+
+<h2>Proyectos</h2>
+<div class="panel">
+  {% if projects %}
+  <table>
+    <tr><th>Slug</th><th>Nombre</th></tr>
+    {% for project in projects %}
+    <tr>
+      <td><a href="/admin/projects/{{ project.slug }}" class="mono">{{ project.slug }}</a></td>
+      <td class="dim">{{ project.name }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="empty">
+    No pertenece a ningún proyecto. Sus agentes recibirán una lista vacía en
+    <code>GET /projects</code> y se detendrán.
+  </div>
+  {% endif %}
+</div>
+
+<h2>Tokens</h2>
+<div class="panel">
+  <form method="post" action="/admin/people/{{ person.id }}/tokens">
+    <div class="row">
+      <div>
+        <label for="label">Etiqueta (para saber cuál es cuál)</label>
+        <input id="label" name="label" type="text" placeholder="laptop de trabajo">
+      </div>
+      <div><button type="submit">Emitir token</button></div>
+    </div>
+  </form>
+</div>
+
+<div class="panel">
+  {% if tokens %}
+  <table>
+    <tr><th>Etiqueta</th><th>Emitido</th><th>Último uso</th><th>Estado</th><th class="right"></th></tr>
+    {% for token in tokens %}
+    <tr>
+      <td>{{ token.label or '—' }}</td>
+      <td class="dim">{{ token.created_at.strftime('%Y-%m-%d') }}</td>
+      <td class="dim">
+        {% if token.last_used_at %}{{ token.last_used_at.strftime('%Y-%m-%d %H:%M') }}
+        {% else %}nunca{% endif %}
+      </td>
+      <td>
+        {% if token.revoked_at %}<span class="tag">revocado</span>
+        {% else %}<span class="tag" style="color:var(--ok)">activo</span>{% endif %}
+      </td>
+      <td class="right">
+        {% if not token.revoked_at %}
+        <form class="inline" method="post"
+              action="/admin/people/{{ person.id }}/tokens/{{ token.id }}/revoke">
+          <button class="danger" type="submit">Revocar</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="empty">Sin tokens. Sus agentes no pueden autenticarse todavía.</div>
+  {% endif %}
+</div>
+
+<p><a href="/admin/people">← Todas las personas</a></p>
+{% endblock %}

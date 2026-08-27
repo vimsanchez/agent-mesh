@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Resumen{% endblock %}
+{% block body %}
+<h1>Resumen</h1>
+<p class="lead">
+  {{ counts.projects }} proyecto(s) · {{ counts.people }} persona(s) ·
+  {{ counts.tokens }} token(s) activo(s) · {{ counts.sessions }} sesión(es) viva(s)
+</p>
+
+<h2>Cómo se arma un proyecto</h2>
+<div class="panel">
+  <ol class="dim" style="margin:0; padding-left:1.2rem">
+    <li>Crea el proyecto en <a href="/admin/projects">Proyectos</a>.</li>
+    <li>Da de alta a cada persona en <a href="/admin/people">Personas</a>.</li>
+    <li>Agrega esas personas al proyecto.</li>
+    <li>Emite un token por persona y pásaselo por un canal seguro.</li>
+  </ol>
+  <p class="dim" style="margin:.9rem 0 0">
+    Ningún agente puede crear proyectos ni agregarse solo: esto es el único
+    camino.
+  </p>
+</div>
+
+<h2>Sesiones vivas</h2>
+<div class="panel">
+  {% if sessions %}
+  <table>
+    <tr><th>Dirección</th><th>Proyecto</th><th>Estado</th><th>Última señal</th></tr>
+    {% for s, project, person in sessions %}
+    <tr>
+      <td class="mono">{{ person.display_name }}.{{ s.role_label }}</td>
+      <td>{{ project.slug }}</td>
+      <td><span class="tag">{{ s.status }}</span></td>
+      <td class="dim">{{ s.last_seen_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="empty">Ninguna sesión registrada todavía.</div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Proyectos{% endblock %}
+{% block body %}
+<h1>Proyectos</h1>
+<p class="lead">El proyecto es la frontera de aislamiento: nada cruza de uno a otro.</p>
+
+<div class="panel">
+  <form method="post" action="/admin/projects">
+    <div class="row">
+      <div>
+        <label for="slug">Slug</label>
+        <input id="slug" name="slug" type="text" required placeholder="proyecto-pablo"
+               pattern="[a-z0-9]+(-[a-z0-9]+)*">
+      </div>
+      <div>
+        <label for="name">Nombre</label>
+        <input id="name" name="name" type="text" required placeholder="Plataforma de pedidos">
+      </div>
+      <div><button type="submit">Crear</button></div>
+    </div>
+  </form>
+</div>
+
+<div class="panel">
+  {% if projects %}
+  <table>
+    <tr><th>Slug</th><th>Nombre</th><th>Miembros</th></tr>
+    {% for project, members in projects %}
+    <tr>
+      <td><a href="/admin/projects/{{ project.slug }}" class="mono">{{ project.slug }}</a></td>
+      <td>{{ project.name }}</td>
+      <td class="dim">
+        {% if members %}{{ members | map(attribute='display_name') | join(', ') }}
+        {% else %}—{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="empty">Todavía no hay proyectos.</div>
+  {% endif %}
+</div>
+{% endblock %}
