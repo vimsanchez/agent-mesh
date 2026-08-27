@@ -141,3 +141,20 @@ class ThreadOut(BaseModel):
     subject: str
     status: str
     messages: list[MessageOut]
+
+
+class UnclaimedOut(BaseModel):
+    """Bandeja de no reclamados, ya filtrada por lo que esta sesión descartó."""
+
+    messages: list[MessageOut]
+
+
+class ClaimOut(BaseModel):
+    id: str
+    status: str
+    claimed: bool
+
+
+class DismissOut(BaseModel):
+    id: str
+    dismissed: bool

@@ -38,10 +38,15 @@ from app.db.models import (
     Thread,
 )
 from app.services import addressing, sessions
-from app.services.errors import NotFoundError, ValidationFailedError
+from app.services.errors import ConflictError, NotFoundError, ValidationFailedError
 
 # Estados en los que un mensaje sigue "en circulación".
 OPEN_STATUSES = ("pending", "unclaimed", "delivered", "in_progress")
+
+# Remitente de los mensajes que emite el propio servicio. No es una dirección de
+# agente: nadie puede registrarse como "mesh" porque el punto está prohibido en
+# los nombres de persona, así que no colisiona con `persona.rol`.
+SERVICE_ADDRESS = "mesh"
 
 
 # ------------------------------------------------------------------ direcciones
@@ -399,6 +404,135 @@ def progress(db: Session, *, agent_session: AgentSession, message_id: str) -> Me
         raise NotFoundError("este mensaje no es tuyo; reclámalo primero")
     if message.status not in ("answered",):
         message.status = "in_progress"
+        db.flush()
+    return message
+
+
+# ------------------------------------------------- bandeja de no reclamados
+
+
+def unclaimed_for(db: Session, *, agent_session: AgentSession) -> list[Message]:
+    """Mensajes del proyecto que nadie está atendiendo y que esta sesión no descartó.
+
+    La bandeja es más amplia que el estado `unclaimed`: incluye los `pending`
+    cuyo destinatario no tiene ninguna sesión viva (§5.3). Un mensaje dirigido a
+    `pablo.db` cuando Pablo no ha levantado ese rol sigue esperándolo, y a la vez
+    aparece aquí para quien pueda resolverlo.
+
+    La comprobación de "destinatario vivo" se hace en Python y no en SQL porque
+    resolver una dirección implica cruzar nombre de persona, rol y sufijo. El
+    volumen lo permite de sobra —el servicio mueve unos mensajes por hora— y cada
+    dirección distinta se resuelve una sola vez.
+    """
+    descartados = dismissals_of(db, agent_session.id)
+
+    candidatos = list(
+        db.scalars(
+            select(Message)
+            .where(
+                Message.project_id == agent_session.project_id,
+                Message.status.in_(("pending", "unclaimed")),
+                Message.claimed_by_session_id.is_(None),
+                # No tiene sentido reclamar lo que tú mismo enviaste. El
+                # `is_(None)` no es adorno: los mensajes que emite el servicio
+                # llevan `sender_session_id` nulo, y en SQL `NULL != 'x'` da
+                # NULL, no TRUE, así que sin esto los avisos automáticos nunca
+                # aparecerían en la bandeja.
+                or_(
+                    Message.sender_session_id.is_(None),
+                    Message.sender_session_id != agent_session.id,
+                ),
+            )
+            .order_by(Message.created_at, Message.id)
+        )
+    )
+
+    vivos: dict[str, bool] = {}
+    salida: list[Message] = []
+    for message in candidatos:
+        if message.id in descartados:
+            continue
+        destino = message.recipient_address
+        if destino is None:
+            salida.append(message)
+            continue
+        if destino not in vivos:
+            vivos[destino] = bool(
+                live_recipients(db, project_id=agent_session.project_id, address=destino)
+            )
+        if not vivos[destino]:
+            salida.append(message)
+    return salida
+
+
+def claim(db: Session, *, agent_session: AgentSession, message_id: str) -> Message:
+    """Reclama un mensaje de la bandeja. `ConflictError` (409) si otro se adelantó.
+
+    Perder el reclamo **no es un fallo**: significa que ya lo atiende alguien.
+    Quien llama decide qué hacer, y `mesh.py` lo distingue con su código de
+    salida 2.
+    """
+    message = _mine(db, agent_session=agent_session, message_id=message_id)
+
+    if message.claimed_by_session_id == agent_session.id:
+        return message  # idempotente: ya era suyo
+    if not try_claim(db, message_id=message.id, session_id=agent_session.id):
+        raise ConflictError(
+            "otra sesión reclamó este mensaje antes que tú; ya lo están "
+            "atendiendo, sigue adelante"
+        )
+    db.refresh(message)
+
+    mailbox, precise = addresses_of(db, agent_session)
+    dirigido_a_otro = message.recipient_address not in (None, mailbox, precise)
+
+    _record_delivery(db, message=message, session_id=agent_session.id)
+    if dirigido_a_otro:
+        _notify_sender_of_claim(db, message=message, claimer=precise)
+    db.flush()
+    return message
+
+
+def _notify_sender_of_claim(db: Session, *, message: Message, claimer: str) -> None:
+    """Avisa al remitente de que su mensaje lo tomó otro rol (§5.3).
+
+    Lo emite el servicio, no una sesión, así que `sender_session_id` va nulo y la
+    dirección de origen es la del propio servicio. Va en el mismo hilo y
+    respondiendo al mensaje reclamado, para que el remitente lo vea en contexto.
+
+    Es `notice` y no `answer` a propósito: un `answer` cerraría la pregunta, y
+    esto no la responde, solo dice quién se hizo cargo.
+    """
+    db.add(
+        Message(
+            project_id=message.project_id,
+            thread_id=message.thread_id,
+            in_reply_to=message.id,
+            sender_session_id=None,
+            sender_address=SERVICE_ADDRESS,
+            recipient_address=message.sender_address,
+            kind="notice",
+            subject=f"Reclamado por {claimer}: {message.subject}",
+            body=(
+                f"Tu mensaje iba dirigido a `{message.recipient_address}`, pero "
+                f"lo reclamó `{claimer}`, que es quien lo está atendiendo.\n\n"
+                f"No hace falta que reenvíes nada."
+            ),
+            status="pending",
+        )
+    )
+
+
+def dismiss(db: Session, *, agent_session: AgentSession, message_id: str) -> Message:
+    """Descarte **por sesión**: otras sesiones lo siguen viendo (§5.3).
+
+    Idempotente. No cambia el estado del mensaje: descartar es una opinión de
+    esta sesión, no un hecho sobre el mensaje.
+    """
+    message = _mine(db, agent_session=agent_session, message_id=message_id)
+    existente = db.get(MessageDismissal, (message.id, agent_session.id))
+    if existente is None:
+        db.add(MessageDismissal(message_id=message.id, session_id=agent_session.id))
         db.flush()
     return message
 
