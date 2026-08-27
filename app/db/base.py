@@ -5,6 +5,8 @@ nombres estables en SQLite y en Postgres. Sin ella, SQLite deja constraints
 anónimos y un `ALTER` posterior no los encuentra.
 """
 
+from datetime import UTC, datetime
+
 from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase
 
@@ -19,3 +21,16 @@ NAMING_CONVENTION = {
 
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
+
+
+def utcnow() -> datetime:
+    """Ahora, en UTC y con tzinfo.
+
+    El default se calcula en Python y no con `func.now()` del motor: así SQLite y
+    Postgres guardan exactamente lo mismo y migrar no cambia los timestamps.
+
+    Ojo al leer: SQLite no persiste la zona, así que devuelve datetimes naive
+    aunque la columna sea `DateTime(timezone=True)`. Quien compare fechas debe
+    normalizar, no asumir tzinfo.
+    """
+    return datetime.now(UTC)
