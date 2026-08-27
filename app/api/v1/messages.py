@@ -18,12 +18,15 @@ from sqlalchemy import select
 
 from app.api.v1.schemas import (
     AckOut,
+    ClaimOut,
+    DismissOut,
     InboxOut,
     MessageOut,
     ProgressOut,
     SendIn,
     SentOut,
     ThreadOut,
+    UnclaimedOut,
 )
 from app.config import Settings
 from app.db.models import AgentSession, Message
@@ -149,6 +152,42 @@ def progress(db: Db, agent_session: CurrentSession, message_id: str) -> Progress
     """Marca `in_progress`: el remitente ve "lo están atendiendo"."""
     message = messaging.progress(db, agent_session=agent_session, message_id=message_id)
     salida = ProgressOut(id=message.id, status=message.status)
+    db.commit()
+    return salida
+
+
+@router.get("/unclaimed", response_model=UnclaimedOut)
+def unclaimed(db: Db, agent_session: CurrentSession, settings: Config) -> UnclaimedOut:
+    """Mensajes que nadie está atendiendo, menos los que esta sesión descartó.
+
+    Se pone al día el proyecto antes de mirar: si no, seguirían fuera de la
+    bandeja los mensajes de sesiones que ya murieron sin confirmar.
+    """
+    messaging.refresh(db, settings, project_id=agent_session.project_id)
+    mensajes = messaging.unclaimed_for(db, agent_session=agent_session)
+    salida = UnclaimedOut(messages=[_to_out(m) for m in mensajes])
+    db.commit()
+    return salida
+
+
+@router.post("/messages/{message_id}/claim", response_model=ClaimOut)
+def claim(db: Db, agent_session: CurrentSession, message_id: str) -> ClaimOut:
+    """Reclamo atómico. `409` si otra sesión se adelantó.
+
+    Ese 409 no es un fallo: significa que ya lo atiende alguien. Al reclamar algo
+    dirigido a otro rol, el servicio avisa al remitente por su cuenta.
+    """
+    message = messaging.claim(db, agent_session=agent_session, message_id=message_id)
+    salida = ClaimOut(id=message.id, status=message.status, claimed=True)
+    db.commit()
+    return salida
+
+
+@router.post("/messages/{message_id}/dismiss", response_model=DismissOut)
+def dismiss(db: Db, agent_session: CurrentSession, message_id: str) -> DismissOut:
+    """Descarte por sesión: otras sesiones lo siguen viendo."""
+    message = messaging.dismiss(db, agent_session=agent_session, message_id=message_id)
+    salida = DismissOut(id=message.id, dismissed=True)
     db.commit()
     return salida
 
