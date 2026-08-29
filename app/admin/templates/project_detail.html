@@ -3,6 +3,11 @@
 {% block body %}
 <h1 class="mono">{{ project.slug }}</h1>
 <p class="lead">{{ project.name }}{% if project.description %} — {{ project.description }}{% endif %}</p>
+<div class="actions">
+  <a class="button" href="/admin/projects/{{ project.slug }}/export.zip">⬇ Exportar todo (.zip)</a>
+  <a class="button" href="/admin/projects/{{ project.slug }}/threads.zip">⬇ Hilos (.zip)</a>
+  <a class="button" href="/admin/projects/{{ project.slug }}/docs.zip">⬇ Documentos (.zip)</a>
+</div>
 
 <h2>Miembros</h2>
 <div class="panel">

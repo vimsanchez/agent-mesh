@@ -3,6 +3,9 @@
 {% block body %}
 <h1 class="mono">{{ document.path }}</h1>
 <p class="lead">{{ document.title }} · v{{ document.current_version }} · <span class="tag">{{ document.status }}</span></p>
+<div class="actions">
+  <a class="button" href="/admin/projects/{{ project.slug }}/docs/{{ document.id }}/download">⬇ Descargar (.md)</a>
+</div>
 
 <h2>Contenido vigente</h2>
 <div class="panel">

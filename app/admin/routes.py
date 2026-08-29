@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 
@@ -33,7 +33,7 @@ from app.db.models import (
     Project,
     Thread,
 )
-from app.services import identity, knowledge
+from app.services import export, identity, knowledge
 from app.services.errors import DomainError
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -367,6 +367,129 @@ def project_doc_detail(
         content=knowledge.current_content(db, document),
         versions=knowledge.history_of(db, document),
     )
+
+
+# ------------------------------------------------- exportar a Markdown (panel)
+#
+# Lectura pura, igual que las vistas de arriba: no marca ni registra nada. La
+# frontera de proyecto se resuelve aquí, como en el resto del panel; el servicio
+# `export` solo serializa lo que se le entrega.
+
+
+def _attachment(content: bytes | str, *, filename: str, media_type: str) -> Response:
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _markdown(content: str, *, filename: str) -> Response:
+    return _attachment(content, filename=filename, media_type="text/markdown; charset=utf-8")
+
+
+def _zip(content: bytes, *, filename: str) -> Response:
+    return _attachment(content, filename=filename, media_type="application/zip")
+
+
+@router.get(
+    "/projects/{slug}/threads/{thread_id}/download",
+    response_model=None,
+    include_in_schema=False,
+)
+def download_thread(
+    request: Request, db: Db, admin: ActiveAdmin, slug: str, thread_id: str
+) -> Response | RedirectResponse:
+    try:
+        project = identity.get_project_by_slug(db, slug)
+    except DomainError as exc:
+        flash(request, exc.detail, error=True)
+        return redirect("/admin/projects")
+
+    thread = db.get(Thread, thread_id)
+    if thread is None or thread.project_id != project.id:
+        flash(request, f"no existe ese hilo en '{slug}'", error=True)
+        return redirect(f"/admin/projects/{slug}/threads")
+
+    return _markdown(
+        export.thread_markdown(project, thread, export.messages_of(db, thread)),
+        filename=export.thread_filename(thread),
+    )
+
+
+@router.get(
+    "/projects/{slug}/docs/{document_id}/download",
+    response_model=None,
+    include_in_schema=False,
+)
+def download_document(
+    request: Request, db: Db, admin: ActiveAdmin, slug: str, document_id: str
+) -> Response | RedirectResponse:
+    try:
+        project = identity.get_project_by_slug(db, slug)
+    except DomainError as exc:
+        flash(request, exc.detail, error=True)
+        return redirect("/admin/projects")
+
+    document = db.get(Document, document_id)
+    if document is None or document.project_id != project.id:
+        flash(request, f"no existe ese documento en '{slug}'", error=True)
+        return redirect(f"/admin/projects/{slug}/docs")
+
+    return _markdown(
+        export.document_markdown(knowledge.current_content(db, document)),
+        filename=export.document_filename(document.path),
+    )
+
+
+@router.get("/projects/{slug}/threads.zip", response_model=None, include_in_schema=False)
+def download_threads(
+    request: Request, db: Db, admin: ActiveAdmin, slug: str
+) -> Response | RedirectResponse:
+    try:
+        project = identity.get_project_by_slug(db, slug)
+    except DomainError as exc:
+        flash(request, exc.detail, error=True)
+        return redirect("/admin/projects")
+
+    contenido = export.project_zip(
+        project, threads=export.threads_of(db, project), documents=None
+    )
+    return _zip(contenido, filename=f"{project.slug}-hilos.zip")
+
+
+@router.get("/projects/{slug}/docs.zip", response_model=None, include_in_schema=False)
+def download_documents(
+    request: Request, db: Db, admin: ActiveAdmin, slug: str
+) -> Response | RedirectResponse:
+    try:
+        project = identity.get_project_by_slug(db, slug)
+    except DomainError as exc:
+        flash(request, exc.detail, error=True)
+        return redirect("/admin/projects")
+
+    contenido = export.project_zip(
+        project, threads=None, documents=export.documents_of(db, project)
+    )
+    return _zip(contenido, filename=f"{project.slug}-docs.zip")
+
+
+@router.get("/projects/{slug}/export.zip", response_model=None, include_in_schema=False)
+def download_project(
+    request: Request, db: Db, admin: ActiveAdmin, slug: str
+) -> Response | RedirectResponse:
+    try:
+        project = identity.get_project_by_slug(db, slug)
+    except DomainError as exc:
+        flash(request, exc.detail, error=True)
+        return redirect("/admin/projects")
+
+    contenido = export.project_zip(
+        project,
+        threads=export.threads_of(db, project),
+        documents=export.documents_of(db, project),
+    )
+    return _zip(contenido, filename=f"{project.slug}.zip")
 
 
 # ---------------------------------------------------------------------- personas

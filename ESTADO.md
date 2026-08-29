@@ -5,7 +5,7 @@ Este archivo existe para que el contexto **viaje entre máquinas**. Lo demás vi
 
 Si acabas de clonar el repo en otra máquina, lee esto primero.
 
-**Última actualización:** 2026-08-27 (tras PR #13)
+**Última actualización:** 2026-08-27 (tras PR #14)
 
 ---
 
@@ -15,7 +15,7 @@ Los **ocho pasos** del orden de implementación de `SPEC.md` §10 están impleme
 las **siete pruebas críticas** del §11 pasan.
 
 ```
-pytest        275 passed
+pytest        287 passed
 ruff / format limpio
 mypy strict   sin fallos en app/ (38 archivos)
 rutas de API  17, exactamente las del §8
@@ -109,6 +109,11 @@ Nada. Todo lo que estaba abierto quedó decidido el 27 de agosto de 2026:
   puerta. `tests/test_despliegue.py` verifica la parte del compose; el túnel en sí no lo
   puede comprobar una prueba.
 - `GET /` redirige (307) a `/admin`; la API vive en `/api/v1` y la salud en `/healthz`.
+- El panel **exporta a Markdown** (PR #14): un hilo o un documento sueltos (`…/download`),
+  todos los hilos (`threads.zip`), todos los documentos (`docs.zip`) o el proyecto entero
+  (`export.zip`, con `INDEX.md`). Solo la versión vigente de cada documento, y solo desde
+  el panel: la API de agentes no cambia. Pensado para bajarlo desde el celular entrando
+  con usuario y contraseña.
 
 ---
 
