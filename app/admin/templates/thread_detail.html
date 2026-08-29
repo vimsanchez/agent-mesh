@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% block title %}{{ thread.subject }}{% endblock %}
 {% block body %}
-<h1>{{ thread.subject }}</h1>
+<div class="titulo">
+  <h1>{{ thread.subject }}</h1>
+  <a class="button" href="/admin/projects/{{ project.slug }}/threads/{{ thread.id }}/download">⬇ Este hilo (.md)</a>
+</div>
 <p class="lead">
   <span class="tag">{{ thread.status }}</span>
   · {{ messages | length }} mensaje(s)
   · <span class="mono dim">{{ thread.id }}</span>
 </p>
-<div class="actions">
-  <a class="button" href="/admin/projects/{{ project.slug }}/threads/{{ thread.id }}/download">⬇ Descargar hilo (.md)</a>
-</div>
 
 {% for message in messages %}
 <div class="panel">

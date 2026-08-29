@@ -1,24 +1,25 @@
 {% extends "base.html" %}
 {% block title %}Documentos de {{ project.slug }}{% endblock %}
 {% block body %}
-<h1>Documentos <span class="dim mono" style="font-weight:400">{{ project.slug }}</span></h1>
+<div class="titulo">
+  <h1>Documentos <span class="dim mono" style="font-weight:400">{{ project.slug }}</span></h1>
+  <a class="button" href="/admin/projects/{{ project.slug }}/docs.zip">⬇ Todos (.zip)</a>
+</div>
 <p class="lead">
   Prefijo bajo = más estable. Los <code>20-contracts/</code> son los acuerdos cerrados.
 </p>
-<div class="actions">
-  <a class="button" href="/admin/projects/{{ project.slug }}/docs.zip">⬇ Todos los documentos (.zip)</a>
-</div>
 
 <div class="panel">
   {% if documents %}
   <table>
-    <tr><th>Ruta</th><th>Título</th><th>Versión</th><th>Actualizado</th></tr>
+    <tr><th>Ruta</th><th>Título</th><th>Versión</th><th>Actualizado</th><th class="right"></th></tr>
     {% for document in documents %}
     <tr>
       <td><a href="/admin/projects/{{ project.slug }}/docs/{{ document.id }}" class="mono">{{ document.path }}</a></td>
       <td class="dim">{{ document.title }}</td>
       <td class="dim">v{{ document.current_version }}</td>
       <td class="dim">{{ document.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td class="right"><a class="button small" href="/admin/projects/{{ project.slug }}/docs/{{ document.id }}/download" title="Descargar este documento en Markdown">⬇ .md</a></td>
     </tr>
     {% endfor %}
   </table>

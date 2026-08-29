@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block title %}{{ document.path }}{% endblock %}
 {% block body %}
-<h1 class="mono">{{ document.path }}</h1>
-<p class="lead">{{ document.title }} · v{{ document.current_version }} · <span class="tag">{{ document.status }}</span></p>
-<div class="actions">
-  <a class="button" href="/admin/projects/{{ project.slug }}/docs/{{ document.id }}/download">⬇ Descargar (.md)</a>
+<div class="titulo">
+  <h1 class="mono">{{ document.path }}</h1>
+  <a class="button" href="/admin/projects/{{ project.slug }}/docs/{{ document.id }}/download">⬇ Este documento (.md)</a>
 </div>
+<p class="lead">{{ document.title }} · v{{ document.current_version }} · <span class="tag">{{ document.status }}</span></p>
 
 <h2>Contenido vigente</h2>
 <div class="panel">
