@@ -282,3 +282,26 @@ def test_las_descargas_exigen_sesion(client: TestClient, db: Session) -> None:
         respuesta = client.get(ruta, follow_redirects=False)
         assert respuesta.status_code == 303, ruta
         assert respuesta.headers["location"] == "/admin/login", ruta
+
+
+def test_cada_pagina_ofrece_la_descarga_que_le_toca(client: TestClient, db: Session) -> None:
+    """El botón vive junto a lo que descarga: la lista trae uno por fila y uno
+    para el conjunto; el proyecto, uno junto a cada sección."""
+    slug, _ = _escenario_de_agentes(client, db)
+    _admin_listo(db)
+    _entrar(client, "jefe@empresa-interna.test")
+    thread_id, doc_id = _ids(client, slug)
+
+    proyecto = client.get(f"/admin/projects/{slug}").text
+    hilos = client.get(f"/admin/projects/{slug}/threads").text
+    docs = client.get(f"/admin/projects/{slug}/docs").text
+
+    assert f"/admin/projects/{slug}/export.zip" in proyecto
+    assert (
+        f"/admin/projects/{slug}/threads.zip" in proyecto
+        and f"/admin/projects/{slug}/docs.zip" in proyecto
+    )
+    assert f"/admin/projects/{slug}/threads.zip" in hilos
+    assert f"/admin/projects/{slug}/threads/{thread_id}/download" in hilos, "uno por fila"
+    assert f"/admin/projects/{slug}/docs.zip" in docs
+    assert f"/admin/projects/{slug}/docs/{doc_id}/download" in docs, "uno por fila"

@@ -4,9 +4,7 @@
 <h1 class="mono">{{ project.slug }}</h1>
 <p class="lead">{{ project.name }}{% if project.description %} — {{ project.description }}{% endif %}</p>
 <div class="actions">
-  <a class="button" href="/admin/projects/{{ project.slug }}/export.zip">⬇ Exportar todo (.zip)</a>
-  <a class="button" href="/admin/projects/{{ project.slug }}/threads.zip">⬇ Hilos (.zip)</a>
-  <a class="button" href="/admin/projects/{{ project.slug }}/docs.zip">⬇ Documentos (.zip)</a>
+  <a class="button" href="/admin/projects/{{ project.slug }}/export.zip">⬇ Exportar todo el proyecto (.zip)</a>
 </div>
 
 <h2>Miembros</h2>
@@ -53,9 +51,13 @@
 
 <h2>Coordinación</h2>
 <div class="panel">
-  <a href="/admin/projects/{{ project.slug }}/threads">Hilos y mensajes</a>
-  &nbsp;·&nbsp;
-  <a href="/admin/projects/{{ project.slug }}/docs">Documentos</a>
+  <div style="display:flex; gap:.5rem .9rem; flex-wrap:wrap; align-items:center">
+    <a href="/admin/projects/{{ project.slug }}/threads">Hilos y mensajes</a>
+    <a class="button small" href="/admin/projects/{{ project.slug }}/threads.zip" title="Todos los hilos en Markdown">⬇ .zip</a>
+    <span class="dim">·</span>
+    <a href="/admin/projects/{{ project.slug }}/docs">Documentos</a>
+    <a class="button small" href="/admin/projects/{{ project.slug }}/docs.zip" title="Todos los documentos en Markdown">⬇ .zip</a>
+  </div>
   <p class="dim" style="margin:.7rem 0 0; font-size:.85rem">
     Vistas de solo lectura. El panel no envía mensajes ni aporta a documentos: eso
     pasa por la API, que es donde el reclamo es atómico y el aislamiento se aplica.
