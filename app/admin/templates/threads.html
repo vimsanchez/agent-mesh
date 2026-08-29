@@ -3,6 +3,9 @@
 {% block body %}
 <h1>Hilos <span class="dim mono" style="font-weight:400">{{ project.slug }}</span></h1>
 <p class="lead">Solo lectura. El panel no envía mensajes ni cambia su estado.</p>
+<div class="actions">
+  <a class="button" href="/admin/projects/{{ project.slug }}/threads.zip">⬇ Todos los hilos (.zip)</a>
+</div>
 
 <div class="panel">
   {% if threads %}
