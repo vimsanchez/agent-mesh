@@ -33,7 +33,10 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import UTC, datetime
+
+# `timezone.utc` y no `datetime.UTC`: este script corre con el Python del
+# sistema de cada persona, y `UTC` a secas solo existe desde 3.11.
+from datetime import datetime, timezone
 from pathlib import Path
 
 STATE_DIR = Path.cwd() / ".agent-mesh"
@@ -49,7 +52,7 @@ EXIT_GONE = 4
 
 
 def log(linea: str) -> None:
-    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     print(f"{stamp} {linea}", flush=True)
 
 
