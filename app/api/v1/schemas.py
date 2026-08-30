@@ -159,6 +159,27 @@ class ThreadOut(BaseModel):
     messages: list[MessageOut]
 
 
+class ThreadResolvedOut(BaseModel):
+    id: str
+    subject: str
+    status: str
+
+
+class ThreadSummary(BaseModel):
+    id: str
+    subject: str
+    status: str
+    message_count: int
+    updated_at: datetime
+
+
+class ThreadsOut(BaseModel):
+    """Respuesta de `GET /threads` (C3). El criterio objetivo de cierre de canal
+    que los agentes inventaron a mano: bandeja vacía en los dos sentidos."""
+
+    threads: list[ThreadSummary]
+
+
 class UnclaimedOut(BaseModel):
     """Bandeja de no reclamados, ya filtrada por lo que esta sesión descartó."""
 

@@ -26,9 +26,13 @@ from app.api.v1.schemas import (
     SendIn,
     SentOut,
     ThreadOut,
+    ThreadResolvedOut,
+    ThreadsOut,
+    ThreadSummary,
     UnclaimedOut,
 )
 from app.config import Settings
+from app.db.enums import ThreadStatus
 from app.db.models import AgentSession, Message, Thread
 from app.db.session import SessionLocal
 from app.security.deps import Config, CurrentSession, Db
@@ -208,6 +212,39 @@ def dismiss(db: Db, agent_session: CurrentSession, message_id: str) -> DismissOu
     """Descarte por sesión: otras sesiones lo siguen viendo."""
     message = messaging.dismiss(db, agent_session=agent_session, message_id=message_id)
     salida = DismissOut(id=message.id, dismissed=True)
+    db.commit()
+    return salida
+
+
+@router.get("/threads", response_model=ThreadsOut)
+def threads(
+    db: Db,
+    agent_session: CurrentSession,
+    status: ThreadStatus | None = None,
+) -> ThreadsOut:
+    """Hilos del proyecto de la sesión, con conteo de mensajes (C3)."""
+    filas = messaging.threads_overview(
+        db, project_id=agent_session.project_id, status=status
+    )
+    return ThreadsOut(
+        threads=[
+            ThreadSummary(
+                id=hilo.id,
+                subject=hilo.subject,
+                status=hilo.status,
+                message_count=total,
+                updated_at=hilo.updated_at,
+            )
+            for hilo, total in filas
+        ]
+    )
+
+
+@router.post("/threads/{thread_id}/resolve", response_model=ThreadResolvedOut)
+def resolve(db: Db, agent_session: CurrentSession, thread_id: str) -> ThreadResolvedOut:
+    """Cierra un hilo. Idempotente; un send posterior lo reabre solo (C3)."""
+    hilo = messaging.resolve_thread(db, agent_session=agent_session, thread_id=thread_id)
+    salida = ThreadResolvedOut(id=hilo.id, subject=hilo.subject, status=hilo.status)
     db.commit()
     return salida
 

@@ -112,18 +112,25 @@ def _resolve_thread(
     thread_id: str | None,
     in_reply_to: Message | None,
 ) -> Thread:
-    """`thread_id` explícito -> heredado de `in_reply_to` -> hilo nuevo (api.md)."""
+    """`thread_id` explícito -> heredado de `in_reply_to` -> hilo nuevo (api.md).
+
+    Un send a un hilo `resolved` lo reabre en la misma transacción (C3): así
+    resolver nunca estorba y no hace falta endpoint de reopen ni permiso de
+    nadie.
+    """
+    thread: Thread | None = None
     if thread_id is not None:
         thread = db.get(Thread, thread_id)
         if thread is None or thread.project_id != project_id:
             # Mismo mensaje exista o no en otro proyecto: confirmar que un hilo
             # ajeno existe ya sería filtrar (regla 2).
             raise NotFoundError(f"no existe el hilo '{thread_id}' en este proyecto")
-        return thread
-    if in_reply_to is not None:
+    elif in_reply_to is not None:
         thread = db.get(Thread, in_reply_to.thread_id)
-        if thread is not None:
-            return thread
+    if thread is not None:
+        if thread.status == "resolved":
+            thread.status = "open"
+        return thread
     thread = Thread(project_id=project_id, subject=subject)
     db.add(thread)
     db.flush()
@@ -613,6 +620,75 @@ def thread_with_messages(
         )
     )
     return thread, mensajes
+
+
+def resolve_thread(db: Session, *, agent_session: AgentSession, thread_id: str) -> Thread:
+    """Marca un hilo como resuelto. Idempotente; 404 fuera del proyecto.
+
+    No hay escritor automático de `resolved` (la nota de enums.py sigue en pie):
+    cierra quien sabe que terminó, el agente. Reabrir tampoco necesita permiso:
+    un send al hilo resuelto lo regresa a `open` (ver `_resolve_thread`).
+    """
+    thread = db.get(Thread, thread_id)
+    if thread is None or thread.project_id != agent_session.project_id:
+        raise NotFoundError(f"no existe el hilo '{thread_id}' en este proyecto")
+    if thread.status != "resolved":
+        thread.status = "resolved"
+        thread.updated_at = utcnow()
+        db.flush()
+    return thread
+
+
+def _message_counts() -> Any:
+    """Subconsulta de conteo de mensajes por hilo, para las vistas de hilos."""
+    return (
+        select(Message.thread_id, func.count().label("total"))
+        .group_by(Message.thread_id)
+        .subquery()
+    )
+
+
+def threads_overview(
+    db: Session, *, project_id: str, status: str | None = None
+) -> list[tuple[Thread, int]]:
+    """Hilos del proyecto con su conteo, los más recientes primero."""
+    conteo = _message_counts()
+    query = (
+        select(Thread, func.coalesce(conteo.c.total, 0))
+        .outerjoin(conteo, conteo.c.thread_id == Thread.id)
+        .where(Thread.project_id == project_id)
+        .order_by(Thread.updated_at.desc(), Thread.id)
+    )
+    if status is not None:
+        query = query.where(Thread.status == status)
+    return [(hilo, int(total)) for hilo, total in db.execute(query)]
+
+
+def oldest_open_threads(
+    db: Session, *, project_id: str, limit: int = 5
+) -> list[tuple[Thread, int]]:
+    """Los hilos sin resolver más viejos. C4 los inyecta en el inbox."""
+    conteo = _message_counts()
+    query = (
+        select(Thread, func.coalesce(conteo.c.total, 0))
+        .outerjoin(conteo, conteo.c.thread_id == Thread.id)
+        .where(Thread.project_id == project_id, Thread.status != "resolved")
+        .order_by(Thread.updated_at.asc(), Thread.id)
+        .limit(limit)
+    )
+    return [(hilo, int(total)) for hilo, total in db.execute(query)]
+
+
+def open_thread_count(db: Session, *, project_id: str) -> int:
+    """Hilos "abiertos" = no resueltos (incluye in_progress)."""
+    return int(
+        db.scalar(
+            select(func.count())
+            .select_from(Thread)
+            .where(Thread.project_id == project_id, Thread.status != "resolved")
+        )
+        or 0
+    )
 
 
 def dismissals_of(db: Session, session_id: str) -> set[str]:
