@@ -126,9 +126,15 @@ class InboxOut(BaseModel):
 
 
 class AckOut(BaseModel):
+    """C1 de SPEC-DELTA: el momento del ack es cuando el mensaje desaparece del
+    inbox; la respuesta conserva la llave del hilo para `GET /threads/{id}`."""
+
     id: str
     status: str
     acked: bool
+    thread_id: str
+    thread_status: str
+    subject: str
 
 
 class ProgressOut(BaseModel):

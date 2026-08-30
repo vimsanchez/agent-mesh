@@ -489,3 +489,32 @@ def test_el_wait_se_recorta_al_maximo_configurado(client: TestClient, mundo: Mun
         f"pidió {SETTINGS.longpoll_max_seconds + 600}s y esperó "
         f"{transcurrido:.1f}s; el tope debe mandar"
     )
+
+
+# --------------------------------------------------------- delta v0.2: C1, ack
+
+
+def test_ack_devuelve_la_llave_del_hilo(client: TestClient, mundo: Mundo) -> None:
+    """C1: el ack trae thread_id, thread_status y subject (SPEC-DELTA).
+
+    El momento del ack es cuando el mensaje desaparece del inbox; si la
+    respuesta trae la llave, el agente que no apuntó nada la conserva.
+    """
+    victor = _registrar(client, mundo, "victor", "db")
+    pablo = _registrar(client, mundo, "pablo", "general")
+    enviado = _enviar(
+        client, mundo, "victor", victor, to="pablo.general", subject="¿cursor u offset?"
+    )
+    recibido = _inbox(client, mundo, "pablo", pablo)[0]
+
+    salida = client.post(
+        f"{V1}/messages/{recibido['id']}/ack",
+        headers=mundo.sesion("pablo", pablo["session_key"]),
+    )
+
+    assert salida.status_code == 200
+    cuerpo = salida.json()
+    assert cuerpo["acked"] is True
+    assert cuerpo["thread_id"] == enviado["thread_id"]
+    assert cuerpo["thread_status"] == "open"
+    assert cuerpo["subject"] == "¿cursor u offset?"

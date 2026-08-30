@@ -29,10 +29,11 @@ from app.api.v1.schemas import (
     UnclaimedOut,
 )
 from app.config import Settings
-from app.db.models import AgentSession, Message
+from app.db.models import AgentSession, Message, Thread
 from app.db.session import SessionLocal
 from app.security.deps import Config, CurrentSession, Db
 from app.services import messaging
+from app.services.errors import NotFoundError
 
 router = APIRouter(tags=["messages"])
 
@@ -140,9 +141,23 @@ async def inbox(
 
 @router.post("/messages/{message_id}/ack", response_model=AckOut)
 def ack(db: Db, agent_session: CurrentSession, message_id: str) -> AckOut:
-    """Confirma recepción. Sin esto, si la sesión muere el mensaje reaparece."""
+    """Confirma recepción. Sin esto, si la sesión muere el mensaje reaparece.
+
+    Devuelve la llave del hilo (C1 de SPEC-DELTA): el agente que no apuntó nada
+    conserva `thread_id` y asunto en la misma salida que acaba de leer.
+    """
     message = messaging.ack(db, agent_session=agent_session, message_id=message_id)
-    salida = AckOut(id=message.id, status=message.status, acked=True)
+    hilo = db.get(Thread, message.thread_id)
+    if hilo is None:  # pragma: no cover - lo impide la FK
+        raise NotFoundError(f"no existe el hilo '{message.thread_id}' en este proyecto")
+    salida = AckOut(
+        id=message.id,
+        status=message.status,
+        acked=True,
+        thread_id=hilo.id,
+        thread_status=hilo.status,
+        subject=message.subject,
+    )
     db.commit()
     return salida
 
