@@ -5,7 +5,7 @@ Este archivo existe para que el contexto **viaje entre máquinas**. Lo demás vi
 
 Si acabas de clonar el repo en otra máquina, lee esto primero.
 
-**Última actualización:** 2026-08-30 (tras el delta v0.2 del servicio)
+**Última actualización:** 2026-08-30 (tras el delta v0.2 del servicio y el plugin 0.2.0)
 
 ---
 
@@ -38,16 +38,24 @@ mypy strict   sin fallos en app/ (39 archivos)
 rutas de API  19: las 17 del §8 + resolve y GET /threads (SPEC-DELTA C3)
 ```
 
-El rediseño del plugin (comandos slash + monitor sin LLM) está especificado en
-`PLUGIN-REDISENO.md` con plan en `docs/superpowers/plans/2026-08-30-plugin-v02-comandos.md`;
-se implementa después de mergear el delta del servicio.
+**El plugin v0.2 también está implementado** (`PLUGIN-REDISENO.md`): `skill/` se
+reestructuró a `plugin/` con la forma de un plugin de Claude Code —
+`.claude-plugin/plugin.json` (0.2.0), `commands/` (`setup`, `register`, `monitor`,
+`stop`), `skills/agent-mesh/` (SKILL.md recortada a solo el juicio en vuelo) y
+`scripts/` (`mesh.py` + `monitor.py`, el sondeador sin LLM que persiste → registra →
+solo entonces acusa). La regla de reparto: el servicio impone, los comandos tienen
+pasos, el monitor espera, la skill juzga. **Pendiente: la prueba de aceptación manual
+(`plugin/ACEPTACION.md`, necesita dos tokens y a Víctor) y, solo después, la copia al
+marketplace.**
 
-La skill de `skill/agent-mesh/` es el **test de aceptación** del servicio, no un
-artefacto que se ajuste a él. Funcionó sin una sola modificación hasta el 27 de agosto de
-2026, cuando el servicio se levantó por primera vez de punta a punta (dos personas, tres
-sesiones, mensajes, reclamo con carrera, documentos con `409`) y todo pasó. Ese mismo
-día se ajustó por primera vez —ver *Decisiones tomadas* abajo— con un escenario de
-prueba antes y después del cambio.
+La skill de `plugin/skills/agent-mesh/` (antes `skill/agent-mesh/`) es el **test de
+aceptación** del servicio, no un artefacto que se ajuste a él. Funcionó sin una sola
+modificación hasta el 27 de agosto de 2026, cuando el servicio se levantó por primera vez
+de punta a punta (dos personas, tres sesiones, mensajes, reclamo con carrera, documentos
+con `409`) y todo pasó. Ese mismo día se ajustó por primera vez —ver *Decisiones
+tomadas* abajo— con un escenario de prueba antes y después del cambio. Desde el plugin
+0.2.0, sus scripts se lintean y formatean como el resto del repo (el bundle del
+marketplace se genera desde aquí).
 
 ### Todo el código está en `main` (desde PR #10)
 
@@ -202,12 +210,15 @@ uv run mypy
 Si `.env` trae la ruta del contenedor, cualquier comando local falla con
 `unable to open database file`.
 
-### La skill se distribuye por el marketplace `vimasamo-skills`
+### El plugin se distribuye por el marketplace `vimasamo-skills`
 
-La fuente de verdad es `skill/agent-mesh/` en **este** repo, que es donde se prueba contra la
-API. La copia instalable vive en `vimsanchez/vimasamo-skills`, carpeta `agent-mesh/`
-(plugin `agent-mesh`, skill `agent-mesh:agent-mesh`). Al cambiar la skill aquí: copiar la
-carpeta allá y subir la versión en su `.claude-plugin/plugin.json`. Instalación:
+La fuente de verdad es `plugin/` en **este** repo, que es donde se prueba contra la API
+(desde el 0.2.0 es un plugin completo: comandos + skill + scripts, con la versión en
+`plugin/.claude-plugin/plugin.json`). La copia instalable vive en
+`vimsanchez/vimasamo-skills`, carpeta `agent-mesh/`. Al cambiar algo aquí: correr
+`plugin/ACEPTACION.md` de punta a punta, copiar `plugin/` completo sobre la carpeta de
+allá y subir la versión. Sigue siendo manual; sigue siendo el punto frágil conocido.
+Instalación:
 `/plugin marketplace add vimsanchez/vimasamo-skills` y `/plugin install agent-mesh@vimasamo-skills`.
 
 ### Levantar y probar de punta a punta
@@ -229,7 +240,7 @@ Luego, con dos agentes en **directorios distintos** (`mesh.py` guarda su sesión
 
 ```bash
 export MESH_URL=http://127.0.0.1:8840 MESH_TOKEN=<token emitido en /admin>
-cd /tmp/agente-a && python .../skill/agent-mesh/scripts/mesh.py register --project <slug> --role db
+cd /tmp/agente-a && python .../plugin/scripts/mesh.py register --project <slug> --role db
 ```
 
 No redirijas la salida a `/dev/null` al verificar: un `send` desde el directorio

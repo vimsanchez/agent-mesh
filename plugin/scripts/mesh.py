@@ -30,6 +30,7 @@ STATE_FILE = STATE_DIR / "session.json"
 
 # --------------------------------------------------------------------------- io
 
+
 def die(msg: str, code: int = 1) -> None:
     print(f"error: {msg}", file=sys.stderr)
     sys.exit(code)
@@ -54,7 +55,7 @@ def env_help(var: str, example: str) -> str:
             f"  PowerShell (permanente, usuario actual):\n"
             f"    [Environment]::SetEnvironmentVariable('{var}', '{example}', 'User')\n"
             f"  cmd.exe:\n"
-            f"    setx {var} \"{example}\"\n"
+            f'    setx {var} "{example}"\n'
             f"  Cierra y vuelve a abrir la terminal para que tome efecto."
         )
     shell = os.environ.get("SHELL", "")
@@ -62,7 +63,7 @@ def env_help(var: str, example: str) -> str:
     return (
         f"{var} no está configurada.\n"
         f"  Agrega esta línea a {rc}:\n"
-        f"    export {var}=\"{example}\"\n"
+        f'    export {var}="{example}"\n'
         f"  Luego: source {rc}"
     )
 
@@ -100,9 +101,15 @@ def read_content(inline: str | None, path: str | None, label: str) -> str:
 
 # ------------------------------------------------------------------------ http
 
-def request(method: str, path: str, body: dict | None = None,
-            params: dict | None = None, with_session: bool = True,
-            timeout: int = 60) -> dict:
+
+def request(
+    method: str,
+    path: str,
+    body: dict | None = None,
+    params: dict | None = None,
+    with_session: bool = True,
+    timeout: int = 60,
+) -> dict:
     url = base_url() + path
     if params:
         clean = {k: v for k, v in params.items() if v is not None}
@@ -140,6 +147,7 @@ def request(method: str, path: str, body: dict | None = None,
 
 # -------------------------------------------------------------------- comandos
 
+
 def cmd_projects(a):
     """Proyectos donde la persona dueña del token ya es miembro.
 
@@ -150,11 +158,16 @@ def cmd_projects(a):
 
 
 def cmd_register(a):
-    out = request("POST", "/sessions",
-                  {"project": a.project, "role": a.role}, with_session=False)
-    save_session({"session_key": out["session_key"],
-                  "address": out["address"],
-                  "project": out["project"]})
+    out = request(
+        "POST", "/sessions", {"project": a.project, "role": a.role}, with_session=False
+    )
+    save_session(
+        {
+            "session_key": out["session_key"],
+            "address": out["address"],
+            "project": out["project"],
+        }
+    )
     emit(out)
 
 
@@ -237,14 +250,20 @@ def cmd_doc(a):
 
 
 def cmd_contribute(a):
-    emit(request("POST", "/docs/contributions", {
-        "document_path": a.path,
-        "base_version": a.base_version,
-        "intent": a.intent,
-        "anchor": a.anchor,
-        "content": read_content(a.content, a.content_file, "content"),
-        "rationale": a.rationale,
-    }))
+    emit(
+        request(
+            "POST",
+            "/docs/contributions",
+            {
+                "document_path": a.path,
+                "base_version": a.base_version,
+                "intent": a.intent,
+                "anchor": a.anchor,
+                "content": read_content(a.content, a.content_file, "content"),
+                "rationale": a.rationale,
+            },
+        )
+    )
 
 
 def cmd_versions(a):
@@ -252,6 +271,7 @@ def cmd_versions(a):
 
 
 # ---------------------------------------------------------------------- parser
+
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="mesh", description="Cliente de Agent Mesh")
@@ -269,7 +289,9 @@ def build_parser() -> argparse.ArgumentParser:
     ro = sub.add_parser("roster", help="Quién está vivo")
     ro.add_argument("--project", help="Slug del proyecto; obligatorio antes de registrar")
     ro.set_defaults(func=cmd_roster)
-    sub.add_parser("unclaimed", help="Bandeja de no reclamados").set_defaults(func=cmd_unclaimed)
+    sub.add_parser("unclaimed", help="Bandeja de no reclamados").set_defaults(
+        func=cmd_unclaimed
+    )
     sub.add_parser("docs", help="Índice de documentos").set_defaults(func=cmd_docs)
 
     t = sub.add_parser("threads", help="Hilos del proyecto, con estado y conteo")
@@ -282,15 +304,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("send", help="Envía un mensaje")
     s.add_argument("--to")
-    s.add_argument("--kind", default="question",
-                   choices=["question", "answer", "notice", "proposal", "agreement"])
+    s.add_argument(
+        "--kind",
+        default="question",
+        choices=["question", "answer", "notice", "proposal", "agreement"],
+    )
     s.add_argument("--subject", required=True)
     s.add_argument("--body")
     s.add_argument("--body-file")
     s.add_argument("--reply-to")
     s.add_argument("--thread")
-    s.add_argument("--document-path",
-                   help="Documento donde quedó escrito el acuerdo (kind=agreement)")
+    s.add_argument(
+        "--document-path", help="Documento donde quedó escrito el acuerdo (kind=agreement)"
+    )
     s.set_defaults(func=cmd_send)
 
     i = sub.add_parser("inbox", help="Long poll de mensajes")
@@ -316,8 +342,9 @@ def build_parser() -> argparse.ArgumentParser:
     c = sub.add_parser("contribute", help="Aporta a un documento")
     c.add_argument("--path", required=True)
     c.add_argument("--base-version", type=int, required=True)
-    c.add_argument("--intent", required=True,
-                   choices=["create", "append", "amend", "deprecate"])
+    c.add_argument(
+        "--intent", required=True, choices=["create", "append", "amend", "deprecate"]
+    )
     c.add_argument("--anchor")
     c.add_argument("--content")
     c.add_argument("--content-file")

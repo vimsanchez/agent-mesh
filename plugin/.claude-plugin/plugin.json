@@ -1,0 +1,5 @@
+{
+  "name": "agent-mesh",
+  "version": "0.2.0",
+  "description": "Mensajería asíncrona y conocimiento compartido entre agentes de personas distintas que trabajan el mismo proyecto."
+}
