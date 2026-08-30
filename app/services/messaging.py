@@ -24,13 +24,15 @@ sesiones y cada una tiene su propio ack.
 from dataclasses import dataclass
 from typing import Any, cast
 
-from sqlalchemy import CursorResult, Select, and_, exists, or_, select, update
+from sqlalchemy import CursorResult, Select, and_, exists, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.db.base import utcnow
 from app.db.models import (
     AgentSession,
+    Document,
+    DocumentVersion,
     Message,
     MessageDelivery,
     MessageDismissal,
@@ -110,18 +112,25 @@ def _resolve_thread(
     thread_id: str | None,
     in_reply_to: Message | None,
 ) -> Thread:
-    """`thread_id` explícito -> heredado de `in_reply_to` -> hilo nuevo (api.md)."""
+    """`thread_id` explícito -> heredado de `in_reply_to` -> hilo nuevo (api.md).
+
+    Un send a un hilo `resolved` lo reabre en la misma transacción (C3): así
+    resolver nunca estorba y no hace falta endpoint de reopen ni permiso de
+    nadie.
+    """
+    thread: Thread | None = None
     if thread_id is not None:
         thread = db.get(Thread, thread_id)
         if thread is None or thread.project_id != project_id:
             # Mismo mensaje exista o no en otro proyecto: confirmar que un hilo
             # ajeno existe ya sería filtrar (regla 2).
             raise NotFoundError(f"no existe el hilo '{thread_id}' en este proyecto")
-        return thread
-    if in_reply_to is not None:
+    elif in_reply_to is not None:
         thread = db.get(Thread, in_reply_to.thread_id)
-        if thread is not None:
-            return thread
+    if thread is not None:
+        if thread.status == "resolved":
+            thread.status = "open"
+        return thread
     thread = Thread(project_id=project_id, subject=subject)
     db.add(thread)
     db.flush()
@@ -149,17 +158,35 @@ def send(
     body: str,
     in_reply_to: str | None = None,
     thread_id: str | None = None,
+    document_path: str | None = None,
+    require_document: bool = False,
 ) -> Sent:
     """Crea un mensaje.
 
     Un `to` que apunta a un rol inexistente **no es error**: el mensaje espera.
     Lo que sí se valida es la *forma* de la dirección, porque `victor..db` no es
     una dirección que nadie vaya a levantar nunca, es basura.
+
+    Con `require_document` (C5, la compuerta REQUIRE_AGREEMENT_DOC), un
+    `agreement` debe citar un documento existente del proyecto: es el mismo
+    patrón que el 409 del reclamo — el servicio impone lo que la prosa no logró.
     """
     if not subject.strip():
         raise ValidationFailedError("el asunto no puede estar vacío")
     if to is not None:
         addressing.parse_address(to)
+    if (
+        kind == "agreement"
+        and require_document
+        and (
+            document_path is None
+            or not _document_exists(db, project_id=sender.project_id, path=document_path)
+        )
+    ):
+        raise ValidationFailedError(
+            "un agreement debe citar el documento donde quedó escrito; "
+            "apórtalo primero con contribute y reintenta con --document-path"
+        )
 
     original = _resolve_reply_target(db, project_id=sender.project_id, in_reply_to=in_reply_to)
     thread = _resolve_thread(
@@ -193,6 +220,79 @@ def send(
     thread.updated_at = utcnow()
     db.flush()
     return Sent(message=message, thread=thread)
+
+
+def _document_exists(db: Session, *, project_id: str, path: str) -> bool:
+    return bool(
+        db.scalar(
+            select(
+                exists().where(Document.project_id == project_id, Document.path == path.strip())
+            )
+        )
+    )
+
+
+@dataclass(frozen=True)
+class SendFeedback:
+    """Lo que el send devuelve sobre la conversación (C2 de SPEC-DELTA)."""
+
+    thread_status: str
+    thread_message_count: int
+    hint: str | None
+
+
+def feedback_for(
+    db: Session, settings: Settings, *, sent: Sent, document_path: str | None = None
+) -> SendFeedback:
+    """Estado del hilo tras enviar, y el hint que convierte prosa en artefacto.
+
+    Prioridad cuando aplican ambos: gana el del agreement, que es el específico.
+    Un `document_path` declarado silencia el hint del agreement (C5): el agente
+    ya dijo dónde quedó escrito.
+    """
+    total = int(
+        db.scalar(
+            select(func.count()).select_from(Message).where(Message.thread_id == sent.thread.id)
+        )
+        or 0
+    )
+    hint: str | None = None
+    if (
+        sent.message.kind == "agreement"
+        and document_path is None
+        and not agreement_cited(db, project_id=sent.thread.project_id, thread_id=sent.thread.id)
+    ):
+        hint = (
+            f"Este acuerdo no está registrado en ningún documento. Si es un "
+            f"acuerdo cerrado, apórtalo a 20-contracts/ citando {sent.thread.id} "
+            f"en el rationale."
+        )
+    elif total > settings.thread_long_hint_after and sent.thread.status != "resolved":
+        hint = (
+            f"Este hilo lleva {total} mensajes abierto. Si alguno de sus temas ya "
+            f"cerró, escríbelo a un documento y marca el hilo con resolve."
+        )
+    return SendFeedback(thread_status=sent.thread.status, thread_message_count=total, hint=hint)
+
+
+def agreement_cited(db: Session, *, project_id: str, thread_id: str) -> bool:
+    """¿Algún rationale del proyecto menciona este hilo?
+
+    No adivina si el acuerdo "cuenta": solo constata que alguien lo citó al
+    aportar. `.contains()` genera el LIKE portable (regla 3: nada específico
+    del motor).
+    """
+    return bool(
+        db.scalar(
+            select(
+                exists().where(
+                    DocumentVersion.document_id == Document.id,
+                    Document.project_id == project_id,
+                    DocumentVersion.rationale.contains(thread_id),
+                )
+            )
+        )
+    )
 
 
 def _mark_answered(original: Message) -> None:
@@ -554,6 +654,75 @@ def thread_with_messages(
         )
     )
     return thread, mensajes
+
+
+def resolve_thread(db: Session, *, agent_session: AgentSession, thread_id: str) -> Thread:
+    """Marca un hilo como resuelto. Idempotente; 404 fuera del proyecto.
+
+    No hay escritor automático de `resolved` (la nota de enums.py sigue en pie):
+    cierra quien sabe que terminó, el agente. Reabrir tampoco necesita permiso:
+    un send al hilo resuelto lo regresa a `open` (ver `_resolve_thread`).
+    """
+    thread = db.get(Thread, thread_id)
+    if thread is None or thread.project_id != agent_session.project_id:
+        raise NotFoundError(f"no existe el hilo '{thread_id}' en este proyecto")
+    if thread.status != "resolved":
+        thread.status = "resolved"
+        thread.updated_at = utcnow()
+        db.flush()
+    return thread
+
+
+def _message_counts() -> Any:
+    """Subconsulta de conteo de mensajes por hilo, para las vistas de hilos."""
+    return (
+        select(Message.thread_id, func.count().label("total"))
+        .group_by(Message.thread_id)
+        .subquery()
+    )
+
+
+def threads_overview(
+    db: Session, *, project_id: str, status: str | None = None
+) -> list[tuple[Thread, int]]:
+    """Hilos del proyecto con su conteo, los más recientes primero."""
+    conteo = _message_counts()
+    query = (
+        select(Thread, func.coalesce(conteo.c.total, 0))
+        .outerjoin(conteo, conteo.c.thread_id == Thread.id)
+        .where(Thread.project_id == project_id)
+        .order_by(Thread.updated_at.desc(), Thread.id)
+    )
+    if status is not None:
+        query = query.where(Thread.status == status)
+    return [(hilo, int(total)) for hilo, total in db.execute(query)]
+
+
+def oldest_open_threads(
+    db: Session, *, project_id: str, limit: int = 5
+) -> list[tuple[Thread, int]]:
+    """Los hilos sin resolver más viejos. C4 los inyecta en el inbox."""
+    conteo = _message_counts()
+    query = (
+        select(Thread, func.coalesce(conteo.c.total, 0))
+        .outerjoin(conteo, conteo.c.thread_id == Thread.id)
+        .where(Thread.project_id == project_id, Thread.status != "resolved")
+        .order_by(Thread.updated_at.asc(), Thread.id)
+        .limit(limit)
+    )
+    return [(hilo, int(total)) for hilo, total in db.execute(query)]
+
+
+def open_thread_count(db: Session, *, project_id: str) -> int:
+    """Hilos "abiertos" = no resueltos (incluye in_progress)."""
+    return int(
+        db.scalar(
+            select(func.count())
+            .select_from(Thread)
+            .where(Thread.project_id == project_id, Thread.status != "resolved")
+        )
+        or 0
+    )
 
 
 def dismissals_of(db: Session, session_id: str) -> set[str]:

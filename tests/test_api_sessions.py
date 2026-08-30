@@ -432,3 +432,47 @@ def test_una_sesion_stale_no_revive_con_una_peticion(client: TestClient, mundo: 
 
     assert respuesta.status_code == 410
     assert "vuelve a registrarte" in respuesta.json()["detail"]
+
+
+# ---------------------------------------------------- delta v0.2: C4, register
+
+
+def test_register_sin_convenciones_devuelve_null(client: TestClient, mundo: Mundo) -> None:
+    """C4: si 00-conventions/messaging.md no existe, conventions es null."""
+    datos = _registrar(client, mundo, "victor", "proyecto-pablo", "db")
+
+    assert datos["conventions"] is None
+    assert datos["open_threads"] == 0
+
+
+def test_register_entrega_las_convenciones_del_proyecto(
+    client: TestClient, mundo: Mundo
+) -> None:
+    """C4: el register entrega 00-conventions/messaging.md íntegro y el conteo
+    de hilos abiertos, sin que ningún agente tenga que acordarse de ir a leer."""
+    primera = _registrar(client, mundo, "victor", "proyecto-pablo", "db")
+    cabeceras = mundo.sesion("victor", primera["session_key"])
+
+    aporte = client.post(
+        f"{V1}/docs/contributions",
+        headers=cabeceras,
+        json={
+            "document_path": "00-conventions/messaging.md",
+            "base_version": 0,
+            "intent": "create",
+            "content": "# Mensajería\nUn tema por mensaje.",
+            "rationale": "convenciones iniciales",
+        },
+    )
+    assert aporte.status_code == 200, aporte.text
+    envio = client.post(
+        f"{V1}/messages",
+        headers=cabeceras,
+        json={"to": "pablo.general", "subject": "hilo abierto", "body": "…"},
+    )
+    assert envio.status_code == 201, envio.text
+
+    segunda = _registrar(client, mundo, "victor", "proyecto-pablo", "backend")
+
+    assert "Un tema por mensaje" in segunda["conventions"]
+    assert segunda["open_threads"] == 1

@@ -184,6 +184,7 @@ def cmd_send(a):
         "body": read_content(a.body, a.body_file, "body"),
         "in_reply_to": a.reply_to,
         "thread_id": a.thread,
+        "document_path": a.document_path,
     }
     emit(request("POST", "/messages", {k: v for k, v in body.items() if v is not None}))
 
@@ -214,6 +215,16 @@ def cmd_dismiss(a):
 
 def cmd_thread(a):
     emit(request("GET", f"/threads/{a.id}"))
+
+
+def cmd_threads(a):
+    """Hilos del proyecto de la sesión, con estado y conteo. --status filtra."""
+    emit(request("GET", "/threads", params={"status": a.status}))
+
+
+def cmd_resolve(a):
+    """Marca un hilo como resuelto. Un send posterior lo reabre solo."""
+    emit(request("POST", f"/threads/{a.thread}/resolve"))
 
 
 def cmd_docs(a):
@@ -261,6 +272,14 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("unclaimed", help="Bandeja de no reclamados").set_defaults(func=cmd_unclaimed)
     sub.add_parser("docs", help="Índice de documentos").set_defaults(func=cmd_docs)
 
+    t = sub.add_parser("threads", help="Hilos del proyecto, con estado y conteo")
+    t.add_argument("--status", choices=["open", "in_progress", "resolved"])
+    t.set_defaults(func=cmd_threads)
+
+    rs = sub.add_parser("resolve", help="Marca un hilo como resuelto")
+    rs.add_argument("--thread", required=True)
+    rs.set_defaults(func=cmd_resolve)
+
     s = sub.add_parser("send", help="Envía un mensaje")
     s.add_argument("--to")
     s.add_argument("--kind", default="question",
@@ -270,6 +289,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--body-file")
     s.add_argument("--reply-to")
     s.add_argument("--thread")
+    s.add_argument("--document-path",
+                   help="Documento donde quedó escrito el acuerdo (kind=agreement)")
     s.set_defaults(func=cmd_send)
 
     i = sub.add_parser("inbox", help="Long poll de mensajes")

@@ -53,6 +53,12 @@ class SessionOut(BaseModel):
     )
     project: str
     registered_at: datetime
+    conventions: str | None = Field(
+        default=None,
+        description="Contenido íntegro de 00-conventions/messaging.md, o null si "
+        "no existe. Léelas y cúmplelas: son las reglas de este proyecto.",
+    )
+    open_threads: int = 0
 
 
 class HeartbeatOut(BaseModel):
@@ -93,12 +99,28 @@ class SendIn(BaseModel):
     body: str = ""
     in_reply_to: str | None = None
     thread_id: str | None = None
+    document_path: str | None = Field(
+        default=None,
+        description="Ruta del documento donde quedó escrito el acuerdo. Con "
+        "REQUIRE_AGREEMENT_DOC activo es obligatoria para kind=agreement; "
+        "apagada, solo silencia el hint.",
+    )
 
 
 class SentOut(BaseModel):
+    """C2 de SPEC-DELTA: el send contesta con el estado de la conversación.
+
+    `hint` es null salvo dos casos: un agreement cuyo hilo nadie citó al
+    aportar, o un hilo que superó THREAD_LONG_HINT_AFTER mensajes sin
+    resolverse.
+    """
+
     id: str
     thread_id: str
     status: str
+    thread_status: str
+    thread_message_count: int
+    hint: str | None = None
 
 
 class MessageOut(BaseModel):
@@ -116,6 +138,21 @@ class MessageOut(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class OpenThreadRef(BaseModel):
+    id: str
+    subject: str
+    updated_at: datetime
+    message_count: int
+
+
+class InboxContext(BaseModel):
+    """Solo presente cuando la respuesta trae mensajes: una respuesta vacía de
+    long poll se queda `{"messages": []}` para no meter ruido en el monitor."""
+
+    open_threads: int
+    oldest_open: list[OpenThreadRef]
+
+
 class InboxOut(BaseModel):
     """Lista vacía = no hay nada nuevo *ahora*.
 
@@ -123,12 +160,19 @@ class InboxOut(BaseModel):
     """
 
     messages: list[MessageOut]
+    context: InboxContext | None = None
 
 
 class AckOut(BaseModel):
+    """C1 de SPEC-DELTA: el momento del ack es cuando el mensaje desaparece del
+    inbox; la respuesta conserva la llave del hilo para `GET /threads/{id}`."""
+
     id: str
     status: str
     acked: bool
+    thread_id: str
+    thread_status: str
+    subject: str
 
 
 class ProgressOut(BaseModel):
@@ -141,6 +185,27 @@ class ThreadOut(BaseModel):
     subject: str
     status: str
     messages: list[MessageOut]
+
+
+class ThreadResolvedOut(BaseModel):
+    id: str
+    subject: str
+    status: str
+
+
+class ThreadSummary(BaseModel):
+    id: str
+    subject: str
+    status: str
+    message_count: int
+    updated_at: datetime
+
+
+class ThreadsOut(BaseModel):
+    """Respuesta de `GET /threads` (C3). El criterio objetivo de cierre de canal
+    que los agentes inventaron a mano: bandeja vacía en los dos sentidos."""
+
+    threads: list[ThreadSummary]
 
 
 class UnclaimedOut(BaseModel):

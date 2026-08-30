@@ -20,6 +20,10 @@ from app.services.errors import ConflictError, NotFoundError, ValidationFailedEr
 
 OBSOLETE_HEADING = "## Obsoleto"
 
+# C4 de SPEC-DELTA: el register entrega este documento a cada sesión que
+# arranca. Es la conversión de instrucción global en instrucción del proyecto.
+CONVENTIONS_PATH = "00-conventions/messaging.md"
+
 
 @dataclass(frozen=True)
 class Contribution:
@@ -66,6 +70,20 @@ def by_path(db: Session, *, project_id: str, path: str) -> Document:
             f"aporta con intent=create y base_version=0"
         )
     return document
+
+
+def content_if_exists(db: Session, *, project_id: str, path: str) -> str | None:
+    """Contenido vigente de un documento, o None si no existe o está vacío.
+
+    El servicio no inventa convenciones: documento ausente y documento vacío
+    dan lo mismo, null (C4 de SPEC-DELTA).
+    """
+    document = db.scalar(
+        select(Document).where(Document.project_id == project_id, Document.path == path.strip())
+    )
+    if document is None:
+        return None
+    return current_content(db, document) or None
 
 
 def current_content(db: Session, document: Document) -> str:

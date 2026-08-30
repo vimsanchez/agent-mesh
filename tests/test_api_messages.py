@@ -1,6 +1,7 @@
 """M5: envío, inbox con long polling, ack, progress e hilos."""
 
 import time
+from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -489,3 +490,241 @@ def test_el_wait_se_recorta_al_maximo_configurado(client: TestClient, mundo: Mun
         f"pidió {SETTINGS.longpoll_max_seconds + 600}s y esperó "
         f"{transcurrido:.1f}s; el tope debe mandar"
     )
+
+
+# --------------------------------------------------------- delta v0.2: C1, ack
+
+
+def test_ack_devuelve_la_llave_del_hilo(client: TestClient, mundo: Mundo) -> None:
+    """C1: el ack trae thread_id, thread_status y subject (SPEC-DELTA).
+
+    El momento del ack es cuando el mensaje desaparece del inbox; si la
+    respuesta trae la llave, el agente que no apuntó nada la conserva.
+    """
+    victor = _registrar(client, mundo, "victor", "db")
+    pablo = _registrar(client, mundo, "pablo", "general")
+    enviado = _enviar(
+        client, mundo, "victor", victor, to="pablo.general", subject="¿cursor u offset?"
+    )
+    recibido = _inbox(client, mundo, "pablo", pablo)[0]
+
+    salida = client.post(
+        f"{V1}/messages/{recibido['id']}/ack",
+        headers=mundo.sesion("pablo", pablo["session_key"]),
+    )
+
+    assert salida.status_code == 200
+    cuerpo = salida.json()
+    assert cuerpo["acked"] is True
+    assert cuerpo["thread_id"] == enviado["thread_id"]
+    assert cuerpo["thread_status"] == "open"
+    assert cuerpo["subject"] == "¿cursor u offset?"
+
+
+# -------------------------------------------------------- delta v0.2: C2, send
+
+
+def test_send_devuelve_estado_del_hilo_y_conteo(client: TestClient, mundo: Mundo) -> None:
+    """C2: SentOut trae thread_status y thread_message_count siempre."""
+    victor = _registrar(client, mundo, "victor", "db")
+
+    primero = _enviar(client, mundo, "victor", victor, to="pablo.general")
+    assert primero["thread_status"] == "open"
+    assert primero["thread_message_count"] == 1
+    assert primero["hint"] is None
+
+    segundo = _enviar(
+        client, mundo, "victor", victor, to="pablo.general", thread_id=primero["thread_id"]
+    )
+    assert segundo["thread_message_count"] == 2
+
+
+def test_agreement_sin_cita_en_rationales_trae_hint(client: TestClient, mundo: Mundo) -> None:
+    """C2 caso 1: agreement cuyo hilo nadie citó al aportar -> hint no nulo."""
+    victor = _registrar(client, mundo, "victor", "db")
+
+    salida = _enviar(client, mundo, "victor", victor, to="pablo.general", kind="agreement")
+
+    assert salida["hint"] is not None
+    assert salida["thread_id"] in salida["hint"]
+    assert "20-contracts/" in salida["hint"]
+
+
+def test_agreement_ya_citado_no_trae_hint(client: TestClient, mundo: Mundo) -> None:
+    """C2 caso 1, negativo: un rationale que menciona el hilo silencia el hint."""
+    victor = _registrar(client, mundo, "victor", "db")
+    primero = _enviar(client, mundo, "victor", victor, to="pablo.general", kind="agreement")
+
+    aporte = client.post(
+        f"{V1}/docs/contributions",
+        headers=mundo.sesion("victor", victor["session_key"]),
+        json={
+            "document_path": "20-contracts/paginacion.md",
+            "base_version": 0,
+            "intent": "create",
+            "content": "Cursor, no offset.",
+            "rationale": f"Acordado en {primero['thread_id']}",
+        },
+    )
+    assert aporte.status_code == 200, aporte.text
+
+    segundo = _enviar(
+        client,
+        mundo,
+        "victor",
+        victor,
+        to="pablo.general",
+        kind="agreement",
+        thread_id=primero["thread_id"],
+    )
+    assert segundo["hint"] is None
+
+
+def test_hilo_largo_trae_hint(client: TestClient, mundo: Mundo) -> None:
+    """C2 caso 2: superar THREAD_LONG_HINT_AFTER sin resolver -> hint de hilo largo."""
+    victor = _registrar(client, mundo, "victor", "db")
+
+    primero = _enviar(client, mundo, "victor", victor, to="pablo.general")
+    ultimo = primero
+    for _ in range(10):  # con el default 10, el mensaje 11 supera el umbral
+        ultimo = _enviar(
+            client, mundo, "victor", victor, to="pablo.general", thread_id=primero["thread_id"]
+        )
+
+    assert ultimo["thread_message_count"] == 11
+    assert ultimo["hint"] is not None
+    assert "resolve" in ultimo["hint"]
+
+
+# ------------------------------------------------------- delta v0.2: C4, inbox
+
+
+def test_inbox_vacio_no_trae_context(client: TestClient, mundo: Mundo) -> None:
+    """C4: la respuesta vacía del long poll queda idéntica a hoy, para no meter
+    ruido en el bucle del monitor."""
+    victor = _registrar(client, mundo, "victor", "db")
+
+    respuesta = client.get(f"{V1}/inbox", headers=mundo.sesion("victor", victor["session_key"]))
+
+    assert respuesta.json() == {"messages": []}
+
+
+def test_inbox_con_mensajes_trae_context(client: TestClient, mundo: Mundo) -> None:
+    """C4: con mensajes llega el bloque context con los hilos abiertos más viejos."""
+    victor = _registrar(client, mundo, "victor", "db")
+    pablo = _registrar(client, mundo, "pablo", "general")
+    enviado = _enviar(client, mundo, "victor", victor, to="pablo.general")
+
+    cuerpo = client.get(
+        f"{V1}/inbox", headers=mundo.sesion("pablo", pablo["session_key"])
+    ).json()
+
+    assert cuerpo["messages"]
+    contexto = cuerpo["context"]
+    assert contexto["open_threads"] == 1
+    assert contexto["oldest_open"][0]["id"] == enviado["thread_id"]
+    assert contexto["oldest_open"][0]["message_count"] == 1
+
+
+# --------------------------------------------- delta v0.2: C5, compuerta dura
+
+
+@pytest.fixture
+def compuerta_agreement(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Enciende REQUIRE_AGREEMENT_DOC solo durante la prueba.
+
+    `monkeypatch` deshace la variable de entorno al salir; el `cache_clear`
+    final deja la caché vacía para que la siguiente prueba relea el entorno
+    ya limpio.
+    """
+    monkeypatch.setenv("REQUIRE_AGREEMENT_DOC", "true")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+def test_document_path_silencia_el_hint_con_compuerta_apagada(
+    client: TestClient, mundo: Mundo
+) -> None:
+    """C5 con la bandera en false: el campo se acepta y solo silencia el hint."""
+    victor = _registrar(client, mundo, "victor", "db")
+
+    salida = _enviar(
+        client,
+        mundo,
+        "victor",
+        victor,
+        to="pablo.general",
+        kind="agreement",
+        document_path="20-contracts/paginacion.md",
+    )
+
+    assert salida["hint"] is None
+
+
+def test_agreement_sin_ruta_es_422_con_compuerta_encendida(
+    client: TestClient, mundo: Mundo, compuerta_agreement: None
+) -> None:
+    victor = _registrar(client, mundo, "victor", "db")
+
+    respuesta = client.post(
+        f"{V1}/messages",
+        headers=mundo.sesion("victor", victor["session_key"]),
+        json={"to": "pablo.general", "kind": "agreement", "subject": "cerramos", "body": "…"},
+    )
+
+    assert respuesta.status_code == 422
+    assert "--document-path" in respuesta.json()["detail"]
+
+
+def test_agreement_con_ruta_inexistente_es_422_con_compuerta_encendida(
+    client: TestClient, mundo: Mundo, compuerta_agreement: None
+) -> None:
+    victor = _registrar(client, mundo, "victor", "db")
+
+    respuesta = client.post(
+        f"{V1}/messages",
+        headers=mundo.sesion("victor", victor["session_key"]),
+        json={
+            "to": "pablo.general",
+            "kind": "agreement",
+            "subject": "cerramos",
+            "body": "…",
+            "document_path": "20-contracts/no-existe.md",
+        },
+    )
+
+    assert respuesta.status_code == 422
+
+
+def test_agreement_con_ruta_valida_pasa_con_compuerta_encendida(
+    client: TestClient, mundo: Mundo, compuerta_agreement: None
+) -> None:
+    victor = _registrar(client, mundo, "victor", "db")
+    cabeceras = mundo.sesion("victor", victor["session_key"])
+    aporte = client.post(
+        f"{V1}/docs/contributions",
+        headers=cabeceras,
+        json={
+            "document_path": "20-contracts/paginacion.md",
+            "base_version": 0,
+            "intent": "create",
+            "content": "Cursor.",
+            "rationale": "acuerdo",
+        },
+    )
+    assert aporte.status_code == 200, aporte.text
+
+    respuesta = client.post(
+        f"{V1}/messages",
+        headers=cabeceras,
+        json={
+            "to": "pablo.general",
+            "kind": "agreement",
+            "subject": "cerramos",
+            "body": "…",
+            "document_path": "20-contracts/paginacion.md",
+        },
+    )
+
+    assert respuesta.status_code == 201, respuesta.text
