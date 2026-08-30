@@ -599,3 +599,35 @@ def test_hilo_largo_trae_hint(client: TestClient, mundo: Mundo) -> None:
     assert ultimo["thread_message_count"] == 11
     assert ultimo["hint"] is not None
     assert "resolve" in ultimo["hint"]
+
+
+# ------------------------------------------------------- delta v0.2: C4, inbox
+
+
+def test_inbox_vacio_no_trae_context(client: TestClient, mundo: Mundo) -> None:
+    """C4: la respuesta vacía del long poll queda idéntica a hoy, para no meter
+    ruido en el bucle del monitor."""
+    victor = _registrar(client, mundo, "victor", "db")
+
+    respuesta = client.get(
+        f"{V1}/inbox", headers=mundo.sesion("victor", victor["session_key"])
+    )
+
+    assert respuesta.json() == {"messages": []}
+
+
+def test_inbox_con_mensajes_trae_context(client: TestClient, mundo: Mundo) -> None:
+    """C4: con mensajes llega el bloque context con los hilos abiertos más viejos."""
+    victor = _registrar(client, mundo, "victor", "db")
+    pablo = _registrar(client, mundo, "pablo", "general")
+    enviado = _enviar(client, mundo, "victor", victor, to="pablo.general")
+
+    cuerpo = client.get(
+        f"{V1}/inbox", headers=mundo.sesion("pablo", pablo["session_key"])
+    ).json()
+
+    assert cuerpo["messages"]
+    contexto = cuerpo["context"]
+    assert contexto["open_threads"] == 1
+    assert contexto["oldest_open"][0]["id"] == enviado["thread_id"]
+    assert contexto["oldest_open"][0]["message_count"] == 1

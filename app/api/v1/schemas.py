@@ -53,6 +53,12 @@ class SessionOut(BaseModel):
     )
     project: str
     registered_at: datetime
+    conventions: str | None = Field(
+        default=None,
+        description="Contenido íntegro de 00-conventions/messaging.md, o null si "
+        "no existe. Léelas y cúmplelas: son las reglas de este proyecto.",
+    )
+    open_threads: int = 0
 
 
 class HeartbeatOut(BaseModel):
@@ -126,6 +132,21 @@ class MessageOut(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class OpenThreadRef(BaseModel):
+    id: str
+    subject: str
+    updated_at: datetime
+    message_count: int
+
+
+class InboxContext(BaseModel):
+    """Solo presente cuando la respuesta trae mensajes: una respuesta vacía de
+    long poll se queda `{"messages": []}` para no meter ruido en el monitor."""
+
+    open_threads: int
+    oldest_open: list[OpenThreadRef]
+
+
 class InboxOut(BaseModel):
     """Lista vacía = no hay nada nuevo *ahora*.
 
@@ -133,6 +154,7 @@ class InboxOut(BaseModel):
     """
 
     messages: list[MessageOut]
+    context: InboxContext | None = None
 
 
 class AckOut(BaseModel):

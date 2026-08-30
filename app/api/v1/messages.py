@@ -20,8 +20,10 @@ from app.api.v1.schemas import (
     AckOut,
     ClaimOut,
     DismissOut,
+    InboxContext,
     InboxOut,
     MessageOut,
+    OpenThreadRef,
     ProgressOut,
     SendIn,
     SentOut,
@@ -93,7 +95,9 @@ def send(db: Db, agent_session: CurrentSession, settings: Config, body: SendIn) 
     return salida
 
 
-def _poll_once(session_key: str, settings: Settings) -> list[MessageOut]:
+def _poll_once(
+    session_key: str, settings: Settings
+) -> tuple[list[MessageOut], InboxContext | None]:
     """Una pasada del inbox, con su propia sesión de base de datos.
 
     Abre y cierra en cada pasada a propósito: mantener una transacción abierta
@@ -102,13 +106,16 @@ def _poll_once(session_key: str, settings: Settings) -> list[MessageOut]:
 
     Se relee la sesión por su clave en cada pasada en lugar de arrastrar el
     objeto: así, si la sesión caduca a mitad del poll, la siguiente pasada lo ve.
+
+    El contexto (C4) solo se calcula cuando hay mensajes: la respuesta vacía
+    del long poll debe quedar idéntica a la de siempre.
     """
     with SessionLocal() as db:
         agent_session = db.scalar(
             select(AgentSession).where(AgentSession.session_key == session_key)
         )
         if agent_session is None or agent_session.status != "active":
-            return []
+            return [], None
 
         messaging.refresh(db, settings, project_id=agent_session.project_id)
         mailbox, precise = messaging.addresses_of(db, agent_session)
@@ -116,11 +123,29 @@ def _poll_once(session_key: str, settings: Settings) -> list[MessageOut]:
             db, agent_session=agent_session, mailbox=mailbox, precise=precise
         )
         salida = [_to_out(m) for m in mensajes]
+        contexto: InboxContext | None = None
+        if salida:
+            contexto = InboxContext(
+                open_threads=messaging.open_thread_count(
+                    db, project_id=agent_session.project_id
+                ),
+                oldest_open=[
+                    OpenThreadRef(
+                        id=hilo.id,
+                        subject=hilo.subject,
+                        updated_at=hilo.updated_at,
+                        message_count=total,
+                    )
+                    for hilo, total in messaging.oldest_open_threads(
+                        db, project_id=agent_session.project_id, limit=5
+                    )
+                ],
+            )
         db.commit()
-        return salida
+        return salida, contexto
 
 
-@router.get("/inbox", response_model=InboxOut)
+@router.get("/inbox", response_model=InboxOut, response_model_exclude_none=True)
 async def inbox(
     agent_session: CurrentSession,
     settings: Config,
@@ -131,21 +156,26 @@ async def inbox(
     El handler es `async` pero las consultas son síncronas, así que van a un hilo
     aparte: si se ejecutaran aquí, una sola conexión en espera bloquearía el
     event loop y con ella a todos los demás agentes.
+
+    `response_model_exclude_none` mantiene la respuesta vacía idéntica a la de
+    siempre (`{"messages": []}`, sin `"context": null`), que es lo que C4 exige
+    para el bucle del monitor. Los `to`/`in_reply_to` nulos de los mensajes
+    también se omiten aquí; api.md nunca los mostró en el inbox.
     """
     session_key = agent_session.session_key
     espera = min(wait, settings.longpoll_max_seconds)
 
-    mensajes = await run_in_threadpool(_poll_once, session_key, settings)
+    mensajes, contexto = await run_in_threadpool(_poll_once, session_key, settings)
     if mensajes or espera <= 0:
-        return InboxOut(messages=mensajes)
+        return InboxOut(messages=mensajes, context=contexto)
 
     limite = asyncio.get_running_loop().time() + espera
     while asyncio.get_running_loop().time() < limite:
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
-        mensajes = await run_in_threadpool(_poll_once, session_key, settings)
+        mensajes, contexto = await run_in_threadpool(_poll_once, session_key, settings)
         if mensajes:
             break
-    return InboxOut(messages=mensajes)
+    return InboxOut(messages=mensajes, context=contexto)
 
 
 @router.post("/messages/{message_id}/ack", response_model=AckOut)

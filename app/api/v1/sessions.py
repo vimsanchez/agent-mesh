@@ -4,7 +4,7 @@ from fastapi import APIRouter
 
 from app.api.v1.schemas import ClosedOut, HeartbeatOut, RegisterIn, SessionOut
 from app.security.deps import Config, CurrentPerson, Db
-from app.services import messaging, sessions
+from app.services import knowledge, messaging, sessions
 
 router = APIRouter(tags=["sessions"])
 
@@ -15,12 +15,20 @@ def register(db: Db, person: CurrentPerson, body: RegisterIn) -> SessionOut:
 
     `403` si no lo es y `404` si el slug no existe; en ambos casos el `detail`
     dice qué hacer, para que el agente se detenga en vez de improvisar.
+
+    La respuesta trae las convenciones del proyecto y el conteo de hilos
+    abiertos (C4 de SPEC-DELTA): así ningún agente tiene que acordarse de ir
+    a leerlas.
     """
     agent_session = sessions.register(
         db, person=person, slug=body.project, role_label=body.role
     )
     address = sessions.address_of(db, agent_session)
     session_address = sessions.address_of(db, agent_session, precise=True)
+    conventions = knowledge.content_if_exists(
+        db, project_id=agent_session.project_id, path=knowledge.CONVENTIONS_PATH
+    )
+    abiertos = messaging.open_thread_count(db, project_id=agent_session.project_id)
     db.commit()
     return SessionOut(
         session_key=agent_session.session_key,
@@ -28,6 +36,8 @@ def register(db: Db, person: CurrentPerson, body: RegisterIn) -> SessionOut:
         session_address=session_address,
         project=body.project.strip().lower(),
         registered_at=agent_session.registered_at,
+        conventions=conventions,
+        open_threads=abiertos,
     )
 
 
