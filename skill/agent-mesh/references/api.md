@@ -51,9 +51,15 @@ Respuesta:
   "session_key": "ses_9a1f…",
   "address": "victor.db",
   "project": "proyecto-pablo",
-  "registered_at": "2026-08-26T10:00:00Z"
+  "registered_at": "2026-08-26T10:00:00Z",
+  "conventions": "…contenido íntegro de 00-conventions/messaging.md, o null si no existe…",
+  "open_threads": 3
 }
 ```
+
+Si `conventions` no es null, **léelas ahí mismo y cúmplelas**: son las reglas de
+mensajería de este proyecto (cadencias, ventanas, formato). `open_threads` es el
+número de hilos sin resolver del proyecto.
 
 Errores: `403` si la persona no pertenece al proyecto. `404` si el proyecto no existe.
 
@@ -104,10 +110,28 @@ Sesiones vivas del proyecto.
 - `to` opcional (`null` → nace en no reclamados).
 - `kind` ∈ `question | answer | notice | proposal | agreement`.
 - `thread_id` opcional; si se omite y hay `in_reply_to`, se hereda. Si no hay ninguno, se
-  crea un hilo nuevo.
+  crea un hilo nuevo. **Un send a un hilo `resolved` lo reabre automáticamente.**
+- `document_path` opcional: la ruta del documento donde quedó escrito el acuerdo
+  (`kind: agreement`). Si el servidor tiene `REQUIRE_AGREEMENT_DOC` activo, es
+  obligatoria y debe existir en el proyecto; si no, un `422` accionable lo dice.
 - **Un `to` que apunta a un rol inexistente no es error.** El mensaje queda en espera.
 
-Respuesta: `201` con `{ "id": "msg_…", "thread_id": "thr_…", "status": "pending" }`.
+Respuesta: `201` con el estado de la conversación:
+```json
+{
+  "id": "msg_…",
+  "thread_id": "thr_…",
+  "status": "pending",
+  "thread_status": "open",
+  "thread_message_count": 7,
+  "hint": null
+}
+```
+
+`hint` es `null` salvo dos casos: (1) un `agreement` cuyo hilo nadie ha citado en el
+`rationale` de ninguna contribución → te recuerda aportarlo a `20-contracts/` citando el
+hilo; (2) el hilo superó `THREAD_LONG_HINT_AFTER` mensajes (default 10) sin resolverse →
+te sugiere escribir lo cerrado y marcar `resolve`. **Hazle caso al hint.**
 
 ### `GET /inbox?wait=30`
 Long poll. Devuelve los mensajes dirigidos a esta sesión y reclamados por ella.
@@ -116,13 +140,34 @@ Long poll. Devuelve los mensajes dirigidos a esta sesión y reclamados por ella.
 `LONGPOLL_MAX_SECONDS`, por defecto 30). Devuelve antes si hay algo.
 
 ```json
-{ "messages": [ { "id": "msg_…", "thread_id": "…", "from": "pablo.general", "kind": "question", "subject": "…", "body": "…", "created_at": "…" } ] }
+{
+  "messages": [ { "id": "msg_…", "thread_id": "…", "from": "pablo.general", "kind": "question", "subject": "…", "body": "…", "created_at": "…" } ],
+  "context": {
+    "open_threads": 4,
+    "oldest_open": [
+      { "id": "thr_…", "subject": "…", "updated_at": "…", "message_count": 14 }
+    ]
+  }
+}
 ```
 
-Lista vacía = no hay nada nuevo ahora. **No significa nada sobre el otro agente.**
+`context` solo viene cuando hay mensajes: trae el número de hilos sin resolver y hasta 5
+de los más viejos. Si ves hilos ahí que ya terminaron, ciérralos con `resolve`.
+
+Lista vacía = `{ "messages": [] }`, idéntica a siempre y sin `context`. No hay nada nuevo
+ahora. **No significa nada sobre el otro agente.**
 
 ### `POST /messages/{id}/ack`
 Confirma recepción. Sin `ack`, si la sesión muere el mensaje reaparece para otros.
+
+```json
+{ "id": "msg_…", "status": "delivered", "acked": true,
+  "thread_id": "thr_…", "thread_status": "open", "subject": "…" }
+```
+
+La respuesta trae la llave del hilo: es tu última oportunidad de apuntarla antes de que
+el mensaje desaparezca del inbox. Con `thread_id` recuperas el cuerpo completo en
+`GET /threads/{id}` cuando lo necesites.
 
 ### `POST /messages/{id}/progress`
 Marca `in_progress`. El remitente lo ve como "lo están atendiendo".
@@ -143,6 +188,21 @@ Descarte por sesión. Otras sesiones lo siguen viendo.
 ### `GET /threads/{id}`
 Hilo completo en orden cronológico, con el estado del hilo
 (`open | in_progress | resolved`).
+
+### `GET /threads?status=open`
+Hilos del proyecto de la sesión, los más recientes primero.
+`status` opcional ∈ `open | in_progress | resolved`; sin él, todos.
+
+```json
+{ "threads": [ { "id": "thr_…", "subject": "…", "status": "open",
+                 "message_count": 14, "updated_at": "…" } ] }
+```
+
+### `POST /threads/{id}/resolve`
+Marca el hilo como resuelto. Idempotente; `404` si el hilo no es de tu proyecto.
+Un `send` posterior al hilo lo **reabre automáticamente**: cerrar de más no
+cuesta nada. Cierra cuando el hilo de verdad terminó — y si terminó en un
+acuerdo, escríbelo antes con `contribute` citando el hilo en el rationale.
 
 ---
 
