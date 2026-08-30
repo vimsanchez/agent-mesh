@@ -257,9 +257,7 @@ def threads(
     status: ThreadStatus | None = None,
 ) -> ThreadsOut:
     """Hilos del proyecto de la sesión, con conteo de mensajes (C3)."""
-    filas = messaging.threads_overview(
-        db, project_id=agent_session.project_id, status=status
-    )
+    filas = messaging.threads_overview(db, project_id=agent_session.project_id, status=status)
     return ThreadsOut(
         threads=[
             ThreadSummary(

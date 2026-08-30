@@ -226,9 +226,7 @@ def _document_exists(db: Session, *, project_id: str, path: str) -> bool:
     return bool(
         db.scalar(
             select(
-                exists().where(
-                    Document.project_id == project_id, Document.path == path.strip()
-                )
+                exists().where(Document.project_id == project_id, Document.path == path.strip())
             )
         )
     )
@@ -262,9 +260,7 @@ def feedback_for(
     if (
         sent.message.kind == "agreement"
         and document_path is None
-        and not agreement_cited(
-            db, project_id=sent.thread.project_id, thread_id=sent.thread.id
-        )
+        and not agreement_cited(db, project_id=sent.thread.project_id, thread_id=sent.thread.id)
     ):
         hint = (
             f"Este acuerdo no está registrado en ningún documento. Si es un "

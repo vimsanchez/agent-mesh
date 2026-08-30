@@ -539,15 +539,11 @@ def test_send_devuelve_estado_del_hilo_y_conteo(client: TestClient, mundo: Mundo
     assert segundo["thread_message_count"] == 2
 
 
-def test_agreement_sin_cita_en_rationales_trae_hint(
-    client: TestClient, mundo: Mundo
-) -> None:
+def test_agreement_sin_cita_en_rationales_trae_hint(client: TestClient, mundo: Mundo) -> None:
     """C2 caso 1: agreement cuyo hilo nadie citó al aportar -> hint no nulo."""
     victor = _registrar(client, mundo, "victor", "db")
 
-    salida = _enviar(
-        client, mundo, "victor", victor, to="pablo.general", kind="agreement"
-    )
+    salida = _enviar(client, mundo, "victor", victor, to="pablo.general", kind="agreement")
 
     assert salida["hint"] is not None
     assert salida["thread_id"] in salida["hint"]
@@ -557,9 +553,7 @@ def test_agreement_sin_cita_en_rationales_trae_hint(
 def test_agreement_ya_citado_no_trae_hint(client: TestClient, mundo: Mundo) -> None:
     """C2 caso 1, negativo: un rationale que menciona el hilo silencia el hint."""
     victor = _registrar(client, mundo, "victor", "db")
-    primero = _enviar(
-        client, mundo, "victor", victor, to="pablo.general", kind="agreement"
-    )
+    primero = _enviar(client, mundo, "victor", victor, to="pablo.general", kind="agreement")
 
     aporte = client.post(
         f"{V1}/docs/contributions",
@@ -610,9 +604,7 @@ def test_inbox_vacio_no_trae_context(client: TestClient, mundo: Mundo) -> None:
     ruido en el bucle del monitor."""
     victor = _registrar(client, mundo, "victor", "db")
 
-    respuesta = client.get(
-        f"{V1}/inbox", headers=mundo.sesion("victor", victor["session_key"])
-    )
+    respuesta = client.get(f"{V1}/inbox", headers=mundo.sesion("victor", victor["session_key"]))
 
     assert respuesta.json() == {"messages": []}
 

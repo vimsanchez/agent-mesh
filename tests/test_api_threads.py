@@ -17,9 +17,7 @@ def _registrar(
     return respuesta.json()
 
 
-def _enviar(
-    client: TestClient, mundo: Mundo, persona: str, sesion: dict, **cuerpo
-) -> dict:
+def _enviar(client: TestClient, mundo: Mundo, persona: str, sesion: dict, **cuerpo) -> dict:
     payload = {"to": "pablo.general", "subject": "un tema", "body": "…", **cuerpo}
     respuesta = client.post(
         f"{V1}/messages", headers=mundo.sesion(persona, sesion["session_key"]), json=payload
@@ -72,9 +70,9 @@ def test_threads_lista_con_conteo_y_filtro(client: TestClient, mundo: Mundo) -> 
         {"id", "subject", "status", "message_count", "updated_at"} <= t.keys() for t in todos
     )
 
-    abiertos = client.get(
-        f"{V1}/threads", params={"status": "open"}, headers=cabeceras
-    ).json()["threads"]
+    abiertos = client.get(f"{V1}/threads", params={"status": "open"}, headers=cabeceras).json()[
+        "threads"
+    ]
     assert [t["id"] for t in abiertos] == [abierto["thread_id"]]
     assert abiertos[0]["message_count"] == 1
 

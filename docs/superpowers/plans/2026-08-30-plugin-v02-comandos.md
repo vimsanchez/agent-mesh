@@ -423,15 +423,21 @@ def ultimo_asunto_pendiente() -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Monitor de inbox de Agent Mesh")
-    parser.add_argument("--watch", required=True,
-                        help="Dirección contraparte a vigilar, p. ej. pablo.general")
+    parser.add_argument(
+        "--watch", required=True, help="Dirección contraparte a vigilar, p. ej. pablo.general"
+    )
     parser.add_argument("--max-hours", type=float, default=12.0)
     parser.add_argument("--idle-exit-minutes", type=float, default=30.0)
-    parser.add_argument("--interval", type=float, default=5.0,
-                        help="Pausa entre ciclos (la fija el diseño, no se negocia)")
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=5.0,
+        help="Pausa entre ciclos (la fija el diseño, no se negocia)",
+    )
     parser.add_argument("--wait", type=int, default=30, help="Segundos de long poll")
-    parser.add_argument("--roster-every", type=int, default=4,
-                        help="Cada cuántos ciclos se consulta el roster")
+    parser.add_argument(
+        "--roster-every", type=int, default=4, help="Cada cuántos ciclos se consulta el roster"
+    )
     args = parser.parse_args()
 
     if not SESSION_FILE.exists():
@@ -441,8 +447,10 @@ def main() -> int:
     STATE_DIR.mkdir(exist_ok=True)
     STOP_FILE.unlink(missing_ok=True)  # centinela huérfano de una corrida anterior
     PID_FILE.write_text(str(os.getpid()))
-    log(f"monitor arriba: watch={args.watch} max_hours={args.max_hours} "
-        f"idle_exit_minutes={args.idle_exit_minutes} pid={os.getpid()}")
+    log(
+        f"monitor arriba: watch={args.watch} max_hours={args.max_hours} "
+        f"idle_exit_minutes={args.idle_exit_minutes} pid={os.getpid()}"
+    )
 
     inicio = time.monotonic()
     ultima_vida = time.monotonic()  # la cuenta de abandono empieza al arrancar
@@ -459,8 +467,9 @@ def main() -> int:
                 return EXIT_MAXHOURS
 
             try:
-                data = request("GET", "/inbox", params={"wait": args.wait},
-                               timeout=args.wait + 15)
+                data = request(
+                    "GET", "/inbox", params={"wait": args.wait}, timeout=args.wait + 15
+                )
                 pausa = args.interval  # una respuesta sana resetea el backoff
             except urllib.error.HTTPError as exc:
                 if exc.code == 410:
@@ -470,7 +479,9 @@ def main() -> int:
                     pausa = min(pausa * 2, 60.0)
                     log(f"429: pausa ampliada a {pausa:.0f}s")
                 else:
-                    log(f"HTTP {exc.code} en inbox: {exc.read().decode(errors='replace')[:200]}")
+                    log(
+                        f"HTTP {exc.code} en inbox: {exc.read().decode(errors='replace')[:200]}"
+                    )
                 data = {"messages": []}
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
                 log(f"sin conexión: {exc}")
@@ -489,8 +500,10 @@ def main() -> int:
                     if exc.code == 410:
                         log("SESION CADUCA: corre /agent-mesh:register")
                         return EXIT_GONE
-                    log(f"ack de {msg['id']} falló con HTTP {exc.code}; "
-                        f"el mensaje volverá a circular y el archivo ya está en disco")
+                    log(
+                        f"ack de {msg['id']} falló con HTTP {exc.code}; "
+                        f"el mensaje volverá a circular y el archivo ya está en disco"
+                    )
             contexto = data.get("context")
             if contexto:
                 log(f"contexto: {contexto.get('open_threads')} hilos abiertos")
@@ -512,8 +525,10 @@ def main() -> int:
                 except (urllib.error.URLError, TimeoutError, OSError) as exc:
                     log(f"sin conexión al roster: {exc}")
                 if time.monotonic() - ultima_vida > args.idle_exit_minutes * 60:
-                    log(f"ABANDONO: esperaba a {args.watch}; "
-                        f"último asunto pendiente: {ultimo_asunto_pendiente()}")
+                    log(
+                        f"ABANDONO: esperaba a {args.watch}; "
+                        f"último asunto pendiente: {ultimo_asunto_pendiente()}"
+                    )
                     return EXIT_ABANDON
 
             time.sleep(pausa)

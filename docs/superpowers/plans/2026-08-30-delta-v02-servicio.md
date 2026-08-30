@@ -219,7 +219,12 @@ def test_agreement_sin_cita_en_rationales_trae_hint(client, mundo):
 
     salida = client.post(
         "/api/v1/messages",
-        json={"to": "pablo.general", "kind": "agreement", "subject": "cerramos cursor", "body": "…"},
+        json={
+            "to": "pablo.general",
+            "kind": "agreement",
+            "subject": "cerramos cursor",
+            "body": "…",
+        },
         headers=victor,
     ).json()
     assert salida["hint"] is not None
@@ -233,7 +238,12 @@ def test_agreement_ya_citado_no_trae_hint(client, mundo):
 
     primero = client.post(
         "/api/v1/messages",
-        json={"to": "pablo.general", "kind": "agreement", "subject": "cerramos cursor", "body": "…"},
+        json={
+            "to": "pablo.general",
+            "kind": "agreement",
+            "subject": "cerramos cursor",
+            "body": "…",
+        },
         headers=victor,
     ).json()
 
@@ -456,7 +466,9 @@ Crear `tests/test_api_threads.py`:
 """C3 de SPEC-DELTA: resolver hilos, listarlos, y reapertura automática."""
 
 
-def _registra(client, mundo, persona: str, rol: str, proyecto: str = "proyecto-pablo") -> dict[str, str]:
+def _registra(
+    client, mundo, persona: str, rol: str, proyecto: str = "proyecto-pablo"
+) -> dict[str, str]:
     respuesta = client.post(
         "/api/v1/sessions",
         json={"project": proyecto, "role": rol},
@@ -510,9 +522,13 @@ def test_threads_lista_con_conteo_y_filtro(client, mundo):
 
     todos = client.get("/api/v1/threads", headers=victor).json()["threads"]
     assert {t["id"] for t in todos} == {abierto["thread_id"], resuelto["thread_id"]}
-    assert all({"id", "subject", "status", "message_count", "updated_at"} <= t.keys() for t in todos)
+    assert all(
+        {"id", "subject", "status", "message_count", "updated_at"} <= t.keys() for t in todos
+    )
 
-    abiertos = client.get("/api/v1/threads", params={"status": "open"}, headers=victor).json()["threads"]
+    abiertos = client.get("/api/v1/threads", params={"status": "open"}, headers=victor).json()[
+        "threads"
+    ]
     assert [t["id"] for t in abiertos] == [abierto["thread_id"]]
     assert abiertos[0]["message_count"] == 1
 
@@ -683,9 +699,7 @@ def threads(
     status: ThreadStatus | None = Query(default=None),
 ) -> ThreadsOut:
     """Hilos del proyecto de la sesión, con conteo de mensajes (C3)."""
-    filas = messaging.threads_overview(
-        db, project_id=agent_session.project_id, status=status
-    )
+    filas = messaging.threads_overview(db, project_id=agent_session.project_id, status=status)
     return ThreadsOut(
         threads=[
             ThreadSummary(
@@ -1053,7 +1067,9 @@ def test_agreement_sin_ruta_es_422_con_compuerta_encendida(client, mundo, compue
     assert "--document-path" in salida.json()["detail"]
 
 
-def test_agreement_con_ruta_inexistente_es_422_con_compuerta_encendida(client, mundo, compuerta_agreement):
+def test_agreement_con_ruta_inexistente_es_422_con_compuerta_encendida(
+    client, mundo, compuerta_agreement
+):
     victor = _registra(client, mundo, "victor", "db")
     salida = client.post(
         "/api/v1/messages",
@@ -1069,7 +1085,9 @@ def test_agreement_con_ruta_inexistente_es_422_con_compuerta_encendida(client, m
     assert salida.status_code == 422
 
 
-def test_agreement_con_ruta_valida_pasa_con_compuerta_encendida(client, mundo, compuerta_agreement):
+def test_agreement_con_ruta_valida_pasa_con_compuerta_encendida(
+    client, mundo, compuerta_agreement
+):
     victor = _registra(client, mundo, "victor", "db")
     client.post(
         "/api/v1/docs/contributions",
@@ -1161,9 +1179,7 @@ def _document_exists(db: Session, *, project_id: str, path: str) -> bool:
     return bool(
         db.scalar(
             select(
-                exists().where(
-                    Document.project_id == project_id, Document.path == path.strip()
-                )
+                exists().where(Document.project_id == project_id, Document.path == path.strip())
             )
         )
     )
@@ -1192,21 +1208,19 @@ y la condición del hint del agreement pasa a:
 `app/api/v1/messages.py`, handler `send`, pasa los argumentos:
 
 ```python
-    enviado = messaging.send(
-        db,
-        sender=agent_session,
-        to=body.to,
-        kind=body.kind,
-        subject=body.subject,
-        body=body.body,
-        in_reply_to=body.in_reply_to,
-        thread_id=body.thread_id,
-        document_path=body.document_path,
-        require_document=settings.require_agreement_doc,
-    )
-    feedback = messaging.feedback_for(
-        db, settings, sent=enviado, document_path=body.document_path
-    )
+enviado = messaging.send(
+    db,
+    sender=agent_session,
+    to=body.to,
+    kind=body.kind,
+    subject=body.subject,
+    body=body.body,
+    in_reply_to=body.in_reply_to,
+    thread_id=body.thread_id,
+    document_path=body.document_path,
+    require_document=settings.require_agreement_doc,
+)
+feedback = messaging.feedback_for(db, settings, sent=enviado, document_path=body.document_path)
 ```
 
 - [ ] **Step 4: Verificar**
@@ -1263,8 +1277,9 @@ En `build_parser()`, tras el bloque de `roster`:
 En el parser de `send`, junto a `--thread`:
 
 ```python
-    s.add_argument("--document-path",
-                   help="Documento donde quedó escrito el acuerdo (kind=agreement)")
+s.add_argument(
+    "--document-path", help="Documento donde quedó escrito el acuerdo (kind=agreement)"
+)
 ```
 
 y en `cmd_send`, la clave en el cuerpo:
