@@ -59,11 +59,12 @@ def _to_out(message: Message) -> MessageOut:
 
 
 @router.post("/messages", response_model=SentOut, status_code=201)
-def send(db: Db, agent_session: CurrentSession, body: SendIn) -> SentOut:
+def send(db: Db, agent_session: CurrentSession, settings: Config, body: SendIn) -> SentOut:
     """Envía un mensaje.
 
     Un `to` que apunta a un rol que nadie ha levantado no falla: el mensaje
     espera. Y un `kind: answer` con `in_reply_to` cierra el mensaje original.
+    La respuesta trae el estado de la conversación (C2 de SPEC-DELTA).
     """
     enviado = messaging.send(
         db,
@@ -75,10 +76,14 @@ def send(db: Db, agent_session: CurrentSession, body: SendIn) -> SentOut:
         in_reply_to=body.in_reply_to,
         thread_id=body.thread_id,
     )
+    feedback = messaging.feedback_for(db, settings, sent=enviado)
     salida = SentOut(
         id=enviado.message.id,
         thread_id=enviado.thread.id,
         status=enviado.message.status,
+        thread_status=feedback.thread_status,
+        thread_message_count=feedback.thread_message_count,
+        hint=feedback.hint,
     )
     db.commit()
     return salida

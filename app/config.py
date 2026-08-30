@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     session_stale_after_seconds: int = 300
     log_level: str = "INFO"
 
+    # C2 de SPEC-DELTA: a partir de cuántos mensajes un hilo sin resolver
+    # provoca el hint de "escríbelo y marca resolve" en la respuesta del send.
+    thread_long_hint_after: int = 10
+
     @field_validator("bootstrap_admin_email")
     @classmethod
     def _bootstrap_admin_uses_admin_domain(cls, value: str, info: ValidationInfo) -> str:

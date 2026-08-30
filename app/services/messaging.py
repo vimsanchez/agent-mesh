@@ -24,13 +24,15 @@ sesiones y cada una tiene su propio ack.
 from dataclasses import dataclass
 from typing import Any, cast
 
-from sqlalchemy import CursorResult, Select, and_, exists, or_, select, update
+from sqlalchemy import CursorResult, Select, and_, exists, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.db.base import utcnow
 from app.db.models import (
     AgentSession,
+    Document,
+    DocumentVersion,
     Message,
     MessageDelivery,
     MessageDismissal,
@@ -193,6 +195,63 @@ def send(
     thread.updated_at = utcnow()
     db.flush()
     return Sent(message=message, thread=thread)
+
+
+@dataclass(frozen=True)
+class SendFeedback:
+    """Lo que el send devuelve sobre la conversación (C2 de SPEC-DELTA)."""
+
+    thread_status: str
+    thread_message_count: int
+    hint: str | None
+
+
+def feedback_for(db: Session, settings: Settings, *, sent: Sent) -> SendFeedback:
+    """Estado del hilo tras enviar, y el hint que convierte prosa en artefacto.
+
+    Prioridad cuando aplican ambos: gana el del agreement, que es el específico.
+    """
+    total = int(
+        db.scalar(
+            select(func.count()).select_from(Message).where(Message.thread_id == sent.thread.id)
+        )
+        or 0
+    )
+    hint: str | None = None
+    if sent.message.kind == "agreement" and not agreement_cited(
+        db, project_id=sent.thread.project_id, thread_id=sent.thread.id
+    ):
+        hint = (
+            f"Este acuerdo no está registrado en ningún documento. Si es un "
+            f"acuerdo cerrado, apórtalo a 20-contracts/ citando {sent.thread.id} "
+            f"en el rationale."
+        )
+    elif total > settings.thread_long_hint_after and sent.thread.status != "resolved":
+        hint = (
+            f"Este hilo lleva {total} mensajes abierto. Si alguno de sus temas ya "
+            f"cerró, escríbelo a un documento y marca el hilo con resolve."
+        )
+    return SendFeedback(thread_status=sent.thread.status, thread_message_count=total, hint=hint)
+
+
+def agreement_cited(db: Session, *, project_id: str, thread_id: str) -> bool:
+    """¿Algún rationale del proyecto menciona este hilo?
+
+    No adivina si el acuerdo "cuenta": solo constata que alguien lo citó al
+    aportar. `.contains()` genera el LIKE portable (regla 3: nada específico
+    del motor).
+    """
+    return bool(
+        db.scalar(
+            select(
+                exists().where(
+                    DocumentVersion.document_id == Document.id,
+                    Document.project_id == project_id,
+                    DocumentVersion.rationale.contains(thread_id),
+                )
+            )
+        )
+    )
 
 
 def _mark_answered(original: Message) -> None:

@@ -96,9 +96,19 @@ class SendIn(BaseModel):
 
 
 class SentOut(BaseModel):
+    """C2 de SPEC-DELTA: el send contesta con el estado de la conversación.
+
+    `hint` es null salvo dos casos: un agreement cuyo hilo nadie citó al
+    aportar, o un hilo que superó THREAD_LONG_HINT_AFTER mensajes sin
+    resolverse.
+    """
+
     id: str
     thread_id: str
     status: str
+    thread_status: str
+    thread_message_count: int
+    hint: str | None = None
 
 
 class MessageOut(BaseModel):

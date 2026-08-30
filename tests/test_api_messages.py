@@ -518,3 +518,84 @@ def test_ack_devuelve_la_llave_del_hilo(client: TestClient, mundo: Mundo) -> Non
     assert cuerpo["thread_id"] == enviado["thread_id"]
     assert cuerpo["thread_status"] == "open"
     assert cuerpo["subject"] == "¿cursor u offset?"
+
+
+# -------------------------------------------------------- delta v0.2: C2, send
+
+
+def test_send_devuelve_estado_del_hilo_y_conteo(client: TestClient, mundo: Mundo) -> None:
+    """C2: SentOut trae thread_status y thread_message_count siempre."""
+    victor = _registrar(client, mundo, "victor", "db")
+
+    primero = _enviar(client, mundo, "victor", victor, to="pablo.general")
+    assert primero["thread_status"] == "open"
+    assert primero["thread_message_count"] == 1
+    assert primero["hint"] is None
+
+    segundo = _enviar(
+        client, mundo, "victor", victor, to="pablo.general", thread_id=primero["thread_id"]
+    )
+    assert segundo["thread_message_count"] == 2
+
+
+def test_agreement_sin_cita_en_rationales_trae_hint(
+    client: TestClient, mundo: Mundo
+) -> None:
+    """C2 caso 1: agreement cuyo hilo nadie citó al aportar -> hint no nulo."""
+    victor = _registrar(client, mundo, "victor", "db")
+
+    salida = _enviar(
+        client, mundo, "victor", victor, to="pablo.general", kind="agreement"
+    )
+
+    assert salida["hint"] is not None
+    assert salida["thread_id"] in salida["hint"]
+    assert "20-contracts/" in salida["hint"]
+
+
+def test_agreement_ya_citado_no_trae_hint(client: TestClient, mundo: Mundo) -> None:
+    """C2 caso 1, negativo: un rationale que menciona el hilo silencia el hint."""
+    victor = _registrar(client, mundo, "victor", "db")
+    primero = _enviar(
+        client, mundo, "victor", victor, to="pablo.general", kind="agreement"
+    )
+
+    aporte = client.post(
+        f"{V1}/docs/contributions",
+        headers=mundo.sesion("victor", victor["session_key"]),
+        json={
+            "document_path": "20-contracts/paginacion.md",
+            "base_version": 0,
+            "intent": "create",
+            "content": "Cursor, no offset.",
+            "rationale": f"Acordado en {primero['thread_id']}",
+        },
+    )
+    assert aporte.status_code == 200, aporte.text
+
+    segundo = _enviar(
+        client,
+        mundo,
+        "victor",
+        victor,
+        to="pablo.general",
+        kind="agreement",
+        thread_id=primero["thread_id"],
+    )
+    assert segundo["hint"] is None
+
+
+def test_hilo_largo_trae_hint(client: TestClient, mundo: Mundo) -> None:
+    """C2 caso 2: superar THREAD_LONG_HINT_AFTER sin resolver -> hint de hilo largo."""
+    victor = _registrar(client, mundo, "victor", "db")
+
+    primero = _enviar(client, mundo, "victor", victor, to="pablo.general")
+    ultimo = primero
+    for _ in range(10):  # con el default 10, el mensaje 11 supera el umbral
+        ultimo = _enviar(
+            client, mundo, "victor", victor, to="pablo.general", thread_id=primero["thread_id"]
+        )
+
+    assert ultimo["thread_message_count"] == 11
+    assert ultimo["hint"] is not None
+    assert "resolve" in ultimo["hint"]
