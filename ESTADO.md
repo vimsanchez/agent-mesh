@@ -55,7 +55,18 @@ de punta a punta (dos personas, tres sesiones, mensajes, reclamo con carrera, do
 con `409`) y todo pasó. Ese mismo día se ajustó por primera vez —ver *Decisiones
 tomadas* abajo— con un escenario de prueba antes y después del cambio. Desde el plugin
 0.2.0, sus scripts se lintean y formatean como el resto del repo (el bundle del
-marketplace se genera desde aquí).
+marketplace se genera desde aquí), **pero corren con el Python del sistema de cada
+persona**: nada de sintaxis o stdlib de 3.11+ (hay `per-file-ignores` en `pyproject.toml`
+para eso; la lección fue `datetime.UTC`, que un auto-fix de ruff metió y Python 3.10
+rechazó al primer arranque real del monitor).
+
+La mecánica del monitor se validó el 30-ago-2026 contra un servidor local con datos
+sembrados y **Python 3.10 del sistema**: persistir → log → ack (archivo en
+`.agent-mesh/inbox/` con `thread_id` antes del ack), inbox vacío sin `context`, `resolve`
++ `threads --status`, parada por centinela (código 0) y abandono (código 2 con línea
+`ABANDONO:` y el asunto pendiente sacado de `GET /threads`). Queda pendiente la
+aceptación completa de `plugin/ACEPTACION.md` con dos personas reales, que es la
+compuerta de la copia al marketplace.
 
 ### Todo el código está en `main` (desde PR #10)
 
