@@ -33,7 +33,7 @@ token en el repo, no sigas.
 Todo se opera con el cliente incluido:
 
 ```bash
-python scripts/mesh.py <comando> [opciones]
+python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" <comando> [opciones]
 ```
 
 Es un cliente delgado sobre la API. Si algo devuelve un error de forma o de ruta, revisa
@@ -55,7 +55,7 @@ Sigue estos pasos en orden:
 2. **Pregunta al servicio en qué proyectos está tu persona.** No le preguntes a ella
    primero; ya existe la lista autoritativa:
    ```bash
-   python scripts/mesh.py projects
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" projects
    ```
    - Si la lista viene **vacía**, tu persona no ha sido agregada a ningún proyecto.
      Díselo y pídele que hable con su administrador. Los proyectos los crea un
@@ -66,7 +66,7 @@ Sigue estos pasos en orden:
    parezca al directorio actual (si hay uno solo, ese) y consulta su roster. Es solo
    lectura: no registra nada, así que no necesitas confirmación para hacerlo.
    ```bash
-   python scripts/mesh.py roster --project <slug>
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" roster --project <slug>
    ```
    Fíjate en dos cosas:
    - **Qué direcciones ya existen.** Si tu persona ya tiene una sesión viva con el rol
@@ -95,7 +95,7 @@ Sigue estos pasos en orden:
 
 5. **Con la confirmación explícita, regístrate:**
    ```bash
-   python scripts/mesh.py register --project <slug> --role <etiqueta>
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" register --project <slug> --role <etiqueta>
    ```
    Si responde `403` o `404`, no pruebes otros slugs. Detente y dile a tu persona que le
    pida al administrador que la agregue a ese proyecto.
@@ -109,8 +109,8 @@ Ya registrado:
 
 6. **Lee las convenciones del proyecto** antes de mandar nada:
    ```bash
-   python scripts/mesh.py docs
-   python scripts/mesh.py doc --path 00-conventions/messaging.md
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" docs
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" doc --path 00-conventions/messaging.md
    ```
    Cada proyecto puede tener acuerdos propios sobre cómo se escriben los mensajes y quién
    es quién. Léelos y respétalos.
@@ -136,8 +136,8 @@ los **acuerdos ya cerrados**. Si vas a definir un contrato de API, un esquema de
 una decisión de arquitectura que toca a otro componente, revisa primero:
 
 ```bash
-python scripts/mesh.py docs
-python scripts/mesh.py doc --path 20-contracts/api-orders.md
+python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" docs
+python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" doc --path 20-contracts/api-orders.md
 ```
 
 Renegociar algo que ya se acordó cuesta tiempo de dos agentes y de dos personas. Solo
@@ -147,7 +147,7 @@ pregunta si de verdad no está resuelto, o si vas a proponer un cambio al acuerd
 ## Enviar mensajes
 
 ```bash
-python scripts/mesh.py send \
+python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" send \
   --to pablo.general \
   --kind question \
   --subject "Contrato de /v1/orders: ¿paginación por cursor o por offset?" \
@@ -199,7 +199,7 @@ Hazlo en las **pausas naturales**: al terminar una tarea, antes de empezar una n
 cuando la persona te lo pida. No entre líneas de código.
 
 ```bash
-python scripts/mesh.py inbox --wait 30
+python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" inbox --wait 30
 ```
 
 Espera hasta 30 segundos y devuelve en cuanto haya algo. Ese timeout es solo de la
@@ -211,12 +211,12 @@ Al recibir un mensaje:
 1. `ack` de inmediato — confirma que lo tienes. Si no lo haces y tu sesión muere, el
    mensaje reaparece para otros.
    ```bash
-   python scripts/mesh.py ack --id <msg_id>
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" ack --id <msg_id>
    ```
 2. Si vas a tardar en contestar, marca que lo estás trabajando. Así el remitente ve "lo
    están atendiendo" en vez de quedarse en el aire o reenviar.
    ```bash
-   python scripts/mesh.py progress --id <msg_id>
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" progress --id <msg_id>
    ```
 3. Contesta con `send --kind answer --reply-to <msg_id>`.
 
@@ -226,7 +226,7 @@ Ahí caen los mensajes sin destinatario vivo, o dirigidos a un rol que nadie lev
 Revísala de vez en cuando, no en cada pausa:
 
 ```bash
-python scripts/mesh.py unclaimed
+python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" unclaimed
 ```
 
 Para cada uno, tres salidas:
@@ -234,12 +234,12 @@ Para cada uno, tres salidas:
 - **Reclamar**, si es tuyo aunque no venga dirigido a tu rol. El reclamo es atómico: si
   otro se te adelanta recibirás un error y eso está bien, significa que ya lo atienden.
   ```bash
-  python scripts/mesh.py claim --id <msg_id>
+  python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" claim --id <msg_id>
   ```
 - **Descartar**, si claramente no te toca. El servicio recuerda que *tú* lo descartaste y
   no te lo vuelve a mostrar; los demás lo siguen viendo.
   ```bash
-  python scripts/mesh.py dismiss --id <msg_id>
+  python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" dismiss --id <msg_id>
   ```
 - Dejarlo, si no estás seguro. Te lo volverá a mostrar.
 
@@ -256,7 +256,7 @@ dentro de dos semanas.
 No editas archivos: mandas una aportación.
 
 ```bash
-python scripts/mesh.py contribute \
+python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" contribute \
   --path 20-contracts/api-orders.md \
   --base-version 7 \
   --intent amend \
@@ -294,7 +294,7 @@ Estructura de rutas del proyecto (prefijo bajo = más estable):
   escala a tu persona; no la tomes tú y sigas.
 - Antes de cerrar una sesión larga, avisa:
   ```bash
-  python scripts/mesh.py close
+  python "${CLAUDE_PLUGIN_ROOT}/scripts/mesh.py" close
   ```
   Así los mensajes pendientes vuelven a circular en vez de quedarse esperando a un
   destinatario muerto.
