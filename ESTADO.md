@@ -5,21 +5,42 @@ Este archivo existe para que el contexto **viaje entre máquinas**. Lo demás vi
 
 Si acabas de clonar el repo en otra máquina, lee esto primero.
 
-**Última actualización:** 2026-08-27 (tras PR #14)
+**Última actualización:** 2026-08-30 (tras el delta v0.2 del servicio)
 
 ---
 
 ## Dónde está el proyecto
 
 Los **ocho pasos** del orden de implementación de `SPEC.md` §10 están implementados, y
-las **siete pruebas críticas** del §11 pasan.
+las **siete pruebas críticas** del §11 pasan. Encima de eso, los cambios **C1–C5 de
+`SPEC-DELTA.md`** (v0.2, salidos del primer uso real en el proyecto `cck`) también:
+
+- **C1**: el `ack` devuelve `thread_id`, `thread_status` y `subject` — la llave del hilo
+  se conserva en la misma salida que el agente acaba de leer.
+- **C2**: el `send` devuelve `thread_status`, `thread_message_count` y un `hint` cuando
+  un `agreement` no está citado en ningún rationale o un hilo supera
+  `THREAD_LONG_HINT_AFTER` (default 10) sin resolverse.
+- **C3**: `POST /threads/{id}/resolve` (idempotente) y `GET /threads?status=`; un `send`
+  a un hilo `resolved` lo reabre en la misma transacción.
+- **C4**: el `register` entrega `conventions` (contenido de
+  `00-conventions/messaging.md`, o null) y `open_threads`; el inbox con mensajes trae
+  `context` con los hilos abiertos más viejos.
+- **C5**: compuerta `REQUIRE_AGREEMENT_DOC` (default **false**): encendida, un
+  `agreement` sin `document_path` válido es `422` accionable.
+
+Cero migraciones de esquema: todo se calcula de tablas existentes. `mesh.py` ganó
+`threads`, `resolve` y `send --document-path`.
 
 ```
-pytest        287 passed
+pytest        306 passed
 ruff / format limpio
-mypy strict   sin fallos en app/ (38 archivos)
-rutas de API  17, exactamente las del §8
+mypy strict   sin fallos en app/ (39 archivos)
+rutas de API  19: las 17 del §8 + resolve y GET /threads (SPEC-DELTA C3)
 ```
+
+El rediseño del plugin (comandos slash + monitor sin LLM) está especificado en
+`PLUGIN-REDISENO.md` con plan en `docs/superpowers/plans/2026-08-30-plugin-v02-comandos.md`;
+se implementa después de mergear el delta del servicio.
 
 La skill de `skill/agent-mesh/` es el **test de aceptación** del servicio, no un
 artefacto que se ajuste a él. Funcionó sin una sola modificación hasta el 27 de agosto de
@@ -78,6 +99,21 @@ Ahora `current_session` (`app/security/deps.py`) registra señal de vida en **to
 petición con sesión válida, en su propia transacción para no depender del commit del
 handler. Una sesión ya `stale` sigue dando `410`: revivirla dejaría en el aire los
 mensajes que ya volvieron a circular. El endpoint explícito se conserva.
+
+---
+
+## Decisiones tomadas el 30 de agosto de 2026 (delta v0.2)
+
+Dos elecciones que `SPEC-DELTA.md` dejaba abiertas, resueltas al implementar:
+
+- **"Hilo abierto" para los conteos = `status != "resolved"`** (incluye `in_progress`,
+  que hoy nada escribe en hilos). `GET /threads?status=X` en cambio filtra por igualdad
+  exacta: ahí el agente pide un estado literal.
+- **`GET /inbox` responde con `response_model_exclude_none`** para que la respuesta
+  vacía del long poll siga siendo `{"messages": []}` sin `"context": null` (lo exige el
+  delta para el bucle del monitor). Efecto colateral deliberado: `to`/`in_reply_to`
+  nulos también se omiten en el inbox — `api.md` nunca los mostró ahí y los clientes
+  leen con `.get()`.
 
 ---
 
