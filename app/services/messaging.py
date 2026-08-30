@@ -158,17 +158,35 @@ def send(
     body: str,
     in_reply_to: str | None = None,
     thread_id: str | None = None,
+    document_path: str | None = None,
+    require_document: bool = False,
 ) -> Sent:
     """Crea un mensaje.
 
     Un `to` que apunta a un rol inexistente **no es error**: el mensaje espera.
     Lo que sí se valida es la *forma* de la dirección, porque `victor..db` no es
     una dirección que nadie vaya a levantar nunca, es basura.
+
+    Con `require_document` (C5, la compuerta REQUIRE_AGREEMENT_DOC), un
+    `agreement` debe citar un documento existente del proyecto: es el mismo
+    patrón que el 409 del reclamo — el servicio impone lo que la prosa no logró.
     """
     if not subject.strip():
         raise ValidationFailedError("el asunto no puede estar vacío")
     if to is not None:
         addressing.parse_address(to)
+    if (
+        kind == "agreement"
+        and require_document
+        and (
+            document_path is None
+            or not _document_exists(db, project_id=sender.project_id, path=document_path)
+        )
+    ):
+        raise ValidationFailedError(
+            "un agreement debe citar el documento donde quedó escrito; "
+            "apórtalo primero con contribute y reintenta con --document-path"
+        )
 
     original = _resolve_reply_target(db, project_id=sender.project_id, in_reply_to=in_reply_to)
     thread = _resolve_thread(
@@ -204,6 +222,18 @@ def send(
     return Sent(message=message, thread=thread)
 
 
+def _document_exists(db: Session, *, project_id: str, path: str) -> bool:
+    return bool(
+        db.scalar(
+            select(
+                exists().where(
+                    Document.project_id == project_id, Document.path == path.strip()
+                )
+            )
+        )
+    )
+
+
 @dataclass(frozen=True)
 class SendFeedback:
     """Lo que el send devuelve sobre la conversación (C2 de SPEC-DELTA)."""
@@ -213,10 +243,14 @@ class SendFeedback:
     hint: str | None
 
 
-def feedback_for(db: Session, settings: Settings, *, sent: Sent) -> SendFeedback:
+def feedback_for(
+    db: Session, settings: Settings, *, sent: Sent, document_path: str | None = None
+) -> SendFeedback:
     """Estado del hilo tras enviar, y el hint que convierte prosa en artefacto.
 
     Prioridad cuando aplican ambos: gana el del agreement, que es el específico.
+    Un `document_path` declarado silencia el hint del agreement (C5): el agente
+    ya dijo dónde quedó escrito.
     """
     total = int(
         db.scalar(
@@ -225,8 +259,12 @@ def feedback_for(db: Session, settings: Settings, *, sent: Sent) -> SendFeedback
         or 0
     )
     hint: str | None = None
-    if sent.message.kind == "agreement" and not agreement_cited(
-        db, project_id=sent.thread.project_id, thread_id=sent.thread.id
+    if (
+        sent.message.kind == "agreement"
+        and document_path is None
+        and not agreement_cited(
+            db, project_id=sent.thread.project_id, thread_id=sent.thread.id
+        )
     ):
         hint = (
             f"Este acuerdo no está registrado en ningún documento. Si es un "

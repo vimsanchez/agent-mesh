@@ -1,6 +1,7 @@
 """M5: envío, inbox con long polling, ack, progress e hilos."""
 
 import time
+from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -631,3 +632,107 @@ def test_inbox_con_mensajes_trae_context(client: TestClient, mundo: Mundo) -> No
     assert contexto["open_threads"] == 1
     assert contexto["oldest_open"][0]["id"] == enviado["thread_id"]
     assert contexto["oldest_open"][0]["message_count"] == 1
+
+
+# --------------------------------------------- delta v0.2: C5, compuerta dura
+
+
+@pytest.fixture
+def compuerta_agreement(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Enciende REQUIRE_AGREEMENT_DOC solo durante la prueba.
+
+    `monkeypatch` deshace la variable de entorno al salir; el `cache_clear`
+    final deja la caché vacía para que la siguiente prueba relea el entorno
+    ya limpio.
+    """
+    monkeypatch.setenv("REQUIRE_AGREEMENT_DOC", "true")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+def test_document_path_silencia_el_hint_con_compuerta_apagada(
+    client: TestClient, mundo: Mundo
+) -> None:
+    """C5 con la bandera en false: el campo se acepta y solo silencia el hint."""
+    victor = _registrar(client, mundo, "victor", "db")
+
+    salida = _enviar(
+        client,
+        mundo,
+        "victor",
+        victor,
+        to="pablo.general",
+        kind="agreement",
+        document_path="20-contracts/paginacion.md",
+    )
+
+    assert salida["hint"] is None
+
+
+def test_agreement_sin_ruta_es_422_con_compuerta_encendida(
+    client: TestClient, mundo: Mundo, compuerta_agreement: None
+) -> None:
+    victor = _registrar(client, mundo, "victor", "db")
+
+    respuesta = client.post(
+        f"{V1}/messages",
+        headers=mundo.sesion("victor", victor["session_key"]),
+        json={"to": "pablo.general", "kind": "agreement", "subject": "cerramos", "body": "…"},
+    )
+
+    assert respuesta.status_code == 422
+    assert "--document-path" in respuesta.json()["detail"]
+
+
+def test_agreement_con_ruta_inexistente_es_422_con_compuerta_encendida(
+    client: TestClient, mundo: Mundo, compuerta_agreement: None
+) -> None:
+    victor = _registrar(client, mundo, "victor", "db")
+
+    respuesta = client.post(
+        f"{V1}/messages",
+        headers=mundo.sesion("victor", victor["session_key"]),
+        json={
+            "to": "pablo.general",
+            "kind": "agreement",
+            "subject": "cerramos",
+            "body": "…",
+            "document_path": "20-contracts/no-existe.md",
+        },
+    )
+
+    assert respuesta.status_code == 422
+
+
+def test_agreement_con_ruta_valida_pasa_con_compuerta_encendida(
+    client: TestClient, mundo: Mundo, compuerta_agreement: None
+) -> None:
+    victor = _registrar(client, mundo, "victor", "db")
+    cabeceras = mundo.sesion("victor", victor["session_key"])
+    aporte = client.post(
+        f"{V1}/docs/contributions",
+        headers=cabeceras,
+        json={
+            "document_path": "20-contracts/paginacion.md",
+            "base_version": 0,
+            "intent": "create",
+            "content": "Cursor.",
+            "rationale": "acuerdo",
+        },
+    )
+    assert aporte.status_code == 200, aporte.text
+
+    respuesta = client.post(
+        f"{V1}/messages",
+        headers=cabeceras,
+        json={
+            "to": "pablo.general",
+            "kind": "agreement",
+            "subject": "cerramos",
+            "body": "…",
+            "document_path": "20-contracts/paginacion.md",
+        },
+    )
+
+    assert respuesta.status_code == 201, respuesta.text

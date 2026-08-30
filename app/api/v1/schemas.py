@@ -99,6 +99,12 @@ class SendIn(BaseModel):
     body: str = ""
     in_reply_to: str | None = None
     thread_id: str | None = None
+    document_path: str | None = Field(
+        default=None,
+        description="Ruta del documento donde quedó escrito el acuerdo. Con "
+        "REQUIRE_AGREEMENT_DOC activo es obligatoria para kind=agreement; "
+        "apagada, solo silencia el hint.",
+    )
 
 
 class SentOut(BaseModel):

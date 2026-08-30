@@ -81,8 +81,12 @@ def send(db: Db, agent_session: CurrentSession, settings: Config, body: SendIn) 
         body=body.body,
         in_reply_to=body.in_reply_to,
         thread_id=body.thread_id,
+        document_path=body.document_path,
+        require_document=settings.require_agreement_doc,
     )
-    feedback = messaging.feedback_for(db, settings, sent=enviado)
+    feedback = messaging.feedback_for(
+        db, settings, sent=enviado, document_path=body.document_path
+    )
     salida = SentOut(
         id=enviado.message.id,
         thread_id=enviado.thread.id,
