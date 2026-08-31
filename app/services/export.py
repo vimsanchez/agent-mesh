@@ -27,8 +27,9 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db.models import Document, Message, Project, Thread
-from app.services import knowledge
+from app.services import knowledge, timefmt
 
 _MAX_SLUG = 48
 
@@ -60,8 +61,14 @@ def slugify(text: str) -> str:
 
 def thread_filename(thread: Thread) -> str:
     """Fecha + asunto + cola del id: legible al ojo y único aunque dos hilos
-    compartan asunto."""
-    return f"{thread.created_at:%Y-%m-%d}-{slugify(thread.subject)}-{thread.id[-4:]}.md"
+    compartan asunto.
+
+    La fecha va en la zona del panel, igual que la del encabezado: un archivo
+    fechado un día antes que la conversación que contiene confunde a quien lo
+    archiva.
+    """
+    dia = timefmt.day(thread.created_at, timefmt.zona(get_settings().display_timezone))
+    return f"{dia}-{slugify(thread.subject)}-{thread.id[-4:]}.md"
 
 
 def document_filename(path: str) -> str:
@@ -72,7 +79,13 @@ def document_filename(path: str) -> str:
 
 
 def _stamp(momento: datetime) -> str:
-    return f"{momento:%Y-%m-%d %H:%M}Z"
+    """Fecha en la zona del panel (`DISPLAY_TIMEZONE`), con su abreviatura.
+
+    El export lo lee una persona, no un agente: le sirve más su propia hora que
+    UTC. La abreviatura va siempre, porque una hora sin zona en un sistema que
+    cruza máquinas es una hora ambigua.
+    """
+    return timefmt.stamp(momento, timefmt.zona(get_settings().display_timezone))
 
 
 def thread_markdown(project: Project, thread: Thread, messages: list[Message]) -> str:

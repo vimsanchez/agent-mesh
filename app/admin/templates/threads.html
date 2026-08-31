@@ -16,7 +16,7 @@
       <td><a href="/admin/projects/{{ project.slug }}/threads/{{ thread.id }}">{{ thread.subject }}</a></td>
       <td class="dim">{{ cuantos }}</td>
       <td><span class="tag">{{ thread.status }}</span></td>
-      <td class="dim">{{ thread.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td class="dim">{{ thread.updated_at | hora }}</td>
       <td class="right"><a class="button small" href="/admin/projects/{{ project.slug }}/threads/{{ thread.id }}/download" title="Descargar este hilo en Markdown">⬇ .md</a></td>
     </tr>
     {% endfor %}

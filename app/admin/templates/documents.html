@@ -18,7 +18,7 @@
       <td><a href="/admin/projects/{{ project.slug }}/docs/{{ document.id }}" class="mono">{{ document.path }}</a></td>
       <td class="dim">{{ document.title }}</td>
       <td class="dim">v{{ document.current_version }}</td>
-      <td class="dim">{{ document.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td class="dim">{{ document.updated_at | hora }}</td>
       <td class="right"><a class="button small" href="/admin/projects/{{ project.slug }}/docs/{{ document.id }}/download" title="Descargar este documento en Markdown">⬇ .md</a></td>
     </tr>
     {% endfor %}

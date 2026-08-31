@@ -8,6 +8,7 @@ puede leer su contenido. Por eso solo guarda el id del administrador y mensajes
 de una sola pasada. Nunca un token, nunca una contraseña.
 """
 
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -23,6 +24,7 @@ from app.admin.deps import (
     Db,
     redirect,
 )
+from app.config import get_settings
 from app.db.models import (
     AccessToken,
     AdminUser,
@@ -33,11 +35,31 @@ from app.db.models import (
     Project,
     Thread,
 )
-from app.services import export, identity, knowledge
+from app.services import export, identity, knowledge, timefmt
 from app.services.errors import DomainError
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+
+def _hora(momento: datetime, segundos: bool = False) -> str:
+    """Filtro `hora` de las plantillas: UTC de la base -> zona del panel.
+
+    La zona se resuelve en cada render y no al importar, para que un cambio de
+    `DISPLAY_TIMEZONE` surta efecto reiniciando y no reconstruyendo.
+    """
+    return timefmt.stamp(
+        momento, timefmt.zona(get_settings().display_timezone), segundos=segundos
+    )
+
+
+def _fecha(momento: datetime) -> str:
+    """Filtro `fecha`: solo el día, ya convertido a la zona del panel."""
+    return timefmt.day(momento, timefmt.zona(get_settings().display_timezone))
+
+
+templates.env.filters["hora"] = _hora
+templates.env.filters["fecha"] = _fecha
 
 _FLASH_ERROR = "flash_error"
 _FLASH_NOTICE = "flash_notice"

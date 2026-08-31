@@ -68,6 +68,18 @@ def test_el_nombre_del_archivo_es_legible_y_unico() -> None:
     assert re.fullmatch(r"[a-z0-9.-]+", nombre), "solo ASCII seguro para cabeceras y zips"
 
 
+def test_el_nombre_usa_el_dia_del_calendario_de_quien_exporta() -> None:
+    """Un hilo de madrugada UTC pertenece al día anterior en la zona del panel.
+
+    Sin convertir, el archivo saldría fechado un día después de la conversación
+    que contiene, y quien lo archiva no lo encontraría donde lo busca.
+    """
+    _, thread, _ = _hilo_de_juguete()
+    thread.created_at = datetime(2026, 9, 1, 3, 30, tzinfo=UTC)  # 21:30 del 31-ago en CDMX
+
+    assert export.thread_filename(thread).startswith("2026-08-31-")
+
+
 def test_el_hilo_en_markdown_trae_cabecera_y_un_bloque_por_mensaje() -> None:
     project, thread, mensajes = _hilo_de_juguete()
 
@@ -77,8 +89,10 @@ def test_el_hilo_en_markdown_trae_cabecera_y_un_bloque_por_mensaje() -> None:
     assert "Proyecto: proyecto-pablo" in md
     assert "Estado: resolved" in md
     assert "2 mensajes" in md
-    assert "## 1. pablo.general → victor.general · question · 2026-08-27 15:40Z" in md
-    assert "## 2. victor.general → (sin destinatario) · answer · 2026-08-27 15:41Z" in md
+    # En la zona del panel (DISPLAY_TIMEZONE), no en UTC: el export lo lee una
+    # persona. 15:40 UTC son las 09:40 en Ciudad de México.
+    assert "## 1. pablo.general → victor.general · question · 2026-08-27 09:40 CST" in md
+    assert "## 2. victor.general → (sin destinatario) · answer · 2026-08-27 09:41 CST" in md
     assert "¿cursor u offset? Propongo cursor." in md
     assert "Cursor. Acordado." in md
     assert md.endswith("\n")
