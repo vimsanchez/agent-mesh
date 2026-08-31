@@ -21,6 +21,10 @@ os.environ["SECRET_KEY"] = "clave-de-pruebas-no-secreta"
 # vale. Con los 30 s de producción, una sola prueba se llevaría media suite.
 os.environ["LONGPOLL_MAX_SECONDS"] = "3"
 os.environ["LOG_LEVEL"] = "WARNING"
+# Explícita para que las pruebas de presentación no dependan del default ni del
+# reloj de la máquina. Solo afecta cómo se MUESTRAN las fechas; lo guardado y lo
+# que responde la API sigue en UTC.
+os.environ["DISPLAY_TIMEZONE"] = "America/Mexico_City"
 
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402

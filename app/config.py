@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     # arranque: seguro, pero cierra la sesión de los administradores en cada
     # reinicio. En despliegue conviene fijarla.
     secret_key: str = ""
+    # Zona en la que el panel y las exportaciones MUESTRAN las fechas. No toca
+    # lo que se guarda ni lo que responde la API, que son UTC siempre
+    # (ver `services/timefmt.py`).
+    display_timezone: str = "America/Mexico_City"
     longpoll_max_seconds: int = 30
     session_stale_after_seconds: int = 300
     log_level: str = "INFO"

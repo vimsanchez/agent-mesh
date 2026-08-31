@@ -23,7 +23,7 @@
       <td><span class="tag">{{ version.intent }}</span></td>
       <td class="mono dim">{{ version.author_address }}</td>
       <td class="dim">{{ version.rationale }}</td>
-      <td class="dim">{{ version.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td class="dim">{{ version.created_at | hora }}</td>
     </tr>
     {% endfor %}
   </table>

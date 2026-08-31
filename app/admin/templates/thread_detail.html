@@ -20,7 +20,7 @@
     <span class="tag">{{ message.kind }}</span>
     <span class="tag">{{ message.status }}</span>
     <span class="dim" style="margin-left:auto; font-size:.82rem">
-      {{ message.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+      {{ message.created_at | hora(true) }}
     </span>
   </div>
   <div style="margin-top:.5rem; font-weight:600">{{ message.subject }}</div>

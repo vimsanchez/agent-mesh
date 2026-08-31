@@ -31,7 +31,7 @@
       <td class="mono">{{ person.display_name }}.{{ s.role_label }}</td>
       <td>{{ project.slug }}</td>
       <td><span class="tag">{{ s.status }}</span></td>
-      <td class="dim">{{ s.last_seen_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+      <td class="dim">{{ s.last_seen_at | hora(true) }}</td>
     </tr>
     {% endfor %}
   </table>
