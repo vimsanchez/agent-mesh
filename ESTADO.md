@@ -44,9 +44,9 @@ reestructuró a `plugin/` con la forma de un plugin de Claude Code —
 `stop`), `skills/agent-mesh/` (SKILL.md recortada a solo el juicio en vuelo) y
 `scripts/` (`mesh.py` + `monitor.py`, el sondeador sin LLM que persiste → registra →
 solo entonces acusa). La regla de reparto: el servicio impone, los comandos tienen
-pasos, el monitor espera, la skill juzga. **Pendiente: la prueba de aceptación manual
-(`plugin/ACEPTACION.md`, necesita dos tokens y a Víctor) y, solo después, la copia al
-marketplace.**
+pasos, el monitor espera, la skill juzga. **El 0.2.0 ya está publicado en el marketplace
+(31-ago-2026, por decisión de Víctor, con la validación mecánica hecha); queda pendiente
+la prueba de aceptación completa de `plugin/ACEPTACION.md` con dos personas reales.**
 
 La skill de `plugin/skills/agent-mesh/` (antes `skill/agent-mesh/`) es el **test de
 aceptación** del servicio, no un artefacto que se ajuste a él. Funcionó sin una sola
@@ -64,9 +64,10 @@ La mecánica del monitor se validó el 30-ago-2026 contra un servidor local con 
 sembrados y **Python 3.10 del sistema**: persistir → log → ack (archivo en
 `.agent-mesh/inbox/` con `thread_id` antes del ack), inbox vacío sin `context`, `resolve`
 + `threads --status`, parada por centinela (código 0) y abandono (código 2 con línea
-`ABANDONO:` y el asunto pendiente sacado de `GET /threads`). Queda pendiente la
-aceptación completa de `plugin/ACEPTACION.md` con dos personas reales, que es la
-compuerta de la copia al marketplace.
+`ABANDONO:` y el asunto pendiente sacado de `GET /threads`). Con esa validación, Víctor
+decidió publicar el 0.2.0 al marketplace el 31-ago-2026 sin esperar la aceptación
+completa; `plugin/ACEPTACION.md` con dos personas reales sigue pendiente y es la
+compuerta de las próximas versiones.
 
 ### Todo el código está en `main` (desde PR #10)
 
