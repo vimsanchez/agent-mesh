@@ -8,6 +8,7 @@ sagrado persistir → registrar → acusar— y el contrato de códigos de salid
 
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -63,6 +64,21 @@ def test_persist_es_estable_ante_created_at_ausente(
 
     assert ruta.name == "sin-fecha-msg_x.json"
     assert ruta.exists()
+
+
+def test_el_log_lleva_hora_local_con_desfase(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """La persona lee este log en su reloj; el desfase va pegado para que la
+    línea siga siendo interpretable si la pega en un mensaje del mesh."""
+    monitor = _carga_monitor(tmp_path, monkeypatch)
+
+    monitor.log("monitor arriba")
+
+    linea = capsys.readouterr().out.strip()
+    assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{4} monitor arriba$", linea), (
+        f"esperaba fecha local con desfase; llegó {linea!r}"
+    )
 
 
 def test_codigos_de_salida_del_contrato(

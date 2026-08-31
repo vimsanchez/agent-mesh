@@ -52,7 +52,13 @@ EXIT_GONE = 4
 
 
 def log(linea: str) -> None:
-    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    """Una línea con la hora local de esta máquina y su desfase.
+
+    El log lo lee la persona dueña de la sesión, en su reloj; el desfase va
+    pegado (`-0600`) para que la línea siga siendo interpretable cuando se pega
+    en un mensaje del mesh, donde la lee alguien de otro huso.
+    """
+    stamp = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%dT%H:%M:%S%z")
     print(f"{stamp} {linea}", flush=True)
 
 

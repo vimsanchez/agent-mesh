@@ -62,6 +62,8 @@ guion). Al cambiar algo allá, se copia aquí completa y se sube la versión en
 
 ## Versión
 
+- **0.2.1** — el log del monitor se escribe en la hora local de la máquina, con
+  el desfase pegado (`2026-08-31T16:19:50-0600`), en vez de UTC.
 - **0.2.0** — rediseño a comandos (`PLUGIN-REDISENO.md` del repo del servicio): el ciclo
   de vida sale de la skill y se vuelve cuatro comandos; llega el monitor sin LLM; la
   skill queda solo con el juicio en vuelo; `mesh.py` gana `threads`, `resolve` y
