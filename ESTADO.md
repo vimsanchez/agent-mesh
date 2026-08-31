@@ -137,6 +137,31 @@ Dos elecciones que `SPEC-DELTA.md` dejaba abiertas, resueltas al implementar:
 
 ---
 
+## Zonas horarias: qué se convierte y qué no (31 de agosto de 2026)
+
+Regla, para no volver a discutirla: **UTC es el dato, la hora local es la vista.**
+
+- **Se guarda y se responde en UTC**, siempre (`db/types.py`, `references/api.md`).
+  Dos razones concretas: `sessions.expire_stale_sessions` compara `last_seen_at` contra
+  `utcnow()` —reescribir los valores guardados marcaría *todas* las sesiones caducas de
+  golpe y recircularía sus mensajes—, y el mesh conecta máquinas de personas que no
+  tienen por qué compartir huso.
+- **Se muestra en `DISPLAY_TIMEZONE`** (default `America/Mexico_City`): panel y
+  exportación a Markdown, vía `services/timefmt.py`. Como ambos se generan al vuelo
+  desde la base, cambiar esta capa arregló también todo lo ya existente; no hubo que
+  tocar un solo dato.
+- **La conversión incluye las fechas sin hora.** En UTC-6, lo ocurrido entre las 00:00 y
+  las 06:00 UTC cae el día anterior en el calendario de quien lee, y eso afectaba el
+  nombre de los archivos exportados.
+- **Una zona inválida o una imagen sin `tzdata` degradan a UTC**, no tumban el panel.
+- `TZ=America/Mexico_City` en `compose.yaml` es otra cosa: solo el reloj del sistema del
+  contenedor, o sea los logs de uvicorn.
+- En el plugin (0.2.1), `monitor.log` se escribe en hora local con el desfase pegado
+  (`2026-08-31T16:19:50-0600`): lo lee la persona en su reloj, y el desfase mantiene la
+  línea interpretable si la pega en un mensaje del mesh.
+
+---
+
 ## Pendiente de decisión
 
 Nada. Todo lo que estaba abierto quedó decidido el 27 de agosto de 2026:
