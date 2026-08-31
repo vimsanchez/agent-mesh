@@ -1,5 +1,14 @@
 {
   "name": "agent-mesh",
   "version": "0.2.0",
-  "description": "Mensajería asíncrona y conocimiento compartido entre agentes de personas distintas que trabajan el mismo proyecto."
+  "description": "Comunicación asíncrona entre sesiones de agentes de personas distintas que trabajan en el mismo proyecto, a través del servicio Agent Mesh. Cuatro comandos (setup, register, monitor, stop), una skill de juicio en vuelo, el cliente mesh.py y un monitor de inbox sin LLM.",
+  "keywords": [
+    "agentes",
+    "mensajeria",
+    "coordinacion",
+    "multi-agente",
+    "contratos",
+    "claude-code",
+    "agent-mesh"
+  ]
 }
