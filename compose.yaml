@@ -7,6 +7,10 @@ services:
     environment:
       # La ruta dentro del contenedor manda sobre lo que diga .env.
       DATABASE_URL: sqlite:////data/mesh.db
+      # Hora local del contenedor (logs, `date`). Los timestamps de la API y
+      # de la base siguen en UTC a propósito: son la referencia común entre
+      # máquinas de personas distintas.
+      TZ: America/Mexico_City
     volumes:
       - mesh-data:/data
     ports:
